@@ -1,8 +1,4 @@
-name: Azure Static Web Apps CI/CD
-
-on:
-  push:
-    branches:
+name: Azure Static Web Apps CI/CDname:
       - main
 
 jobs:
@@ -20,6 +16,9 @@ jobs:
           action: "upload"
 
           app_location: "app"
-          api_location: ""          # ✅ using external Function App
-          skip_api_build: true      # ✅ IMPORTANT
+          api_location: "api"      # ✅ IMPORTANT
           output_location: ""
+
+
+on:
+  push:
