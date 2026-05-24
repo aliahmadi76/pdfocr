@@ -1,5 +1,9 @@
 {
-  "platform": {
-    "apiRuntime": "python:3.11"
-  }
+  "routes": [
+    {
+      "route": "/api/*",
+      "allowedRoles": ["anonymous"],
+      "rewrite": "https://fn-pdfocr-api.azurewebsites.net/api/{*}"
+    }
+  ]
 }

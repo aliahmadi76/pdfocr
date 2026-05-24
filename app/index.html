@@ -1,1 +1,90 @@
-<h1>PDF OCR App</h1>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>PDF OCR Tool</title>
+  <style>
+    body { font-family: Arial; padding: 30px; }
+    button { margin-top: 10px; padding: 10px 20px; }
+    .file { margin-top: 10px; }
+    .done { color: green; }
+    .processing { color: orange; }
+  </style>
+</head>
+
+<body>
+  <h2>PDF OCR (Searchable PDF)</h2>
+
+  <input type="file" id="files" multiple />
+  <br />
+  <button onclick="processFiles()">Upload & Convert</button>
+
+  <h3>Results:</h3>
+  <div id="results"></div>
+
+<script>
+async function processFiles() {
+  const files = document.getElementById("files").files;
+  const resultsDiv = document.getElementById("results");
+
+  for (const file of files) {
+
+    const row = document.createElement("div");
+    row.className = "file processing";
+    row.innerText = `${file.name} - uploading...`;
+    resultsDiv.appendChild(row);
+
+    try {
+      // ✅ Step 1 - get SAS
+      const sas = await fetch(`/api/upload?filename=${file.name}`).then(r => r.text());
+
+      // ✅ Step 2 - upload file
+      await fetch(sas, {
+        method: "PUT",
+        headers: { "x-ms-blob-type": "BlockBlob" },
+        body: file
+      });
+
+      row.innerText = `${file.name} - starting OCR...`;
+
+      // ✅ Step 3 - start OCR
+      const op = await fetch(`/api/start-ocr`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          blob_url: sas,
+          filename: file.name
+        })
+      }).then(r => r.text());
+
+      // ✅ Step 4 - polling
+      let downloadUrl = null;
+
+      while (!downloadUrl) {
+        await new Promise(r => setTimeout(r, 2000));
+
+        const res = await fetch(`/api/get-ocr-pdf?op=${encodeURIComponent(op)}&filename=${file.name}`);
+        const text = await res.text();
+
+        if (text.startsWith("http")) {
+          downloadUrl = text;
+        } else {
+          row.innerText = `${file.name} - processing...`;
+        }
+      }
+
+      // ✅ Step 5 - done
+      row.innerHTML = `
+        <span class="done">${file.name} ✅ </span>
+        <a href="${downloadUrl}" target="_blank">Download</a>
+      `;
+
+    } catch (err) {
+      row.innerText = `${file.name} - ERROR`;
+      console.error(err);
+    }
+  }
+}
+</script>
+
+</body>
+</html>

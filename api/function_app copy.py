@@ -3,7 +3,6 @@ from datetime import datetime, timedelta
 
 import azure.functions as func
 import requests   # ✅ add only now
-import json
 from azure.storage.blob import generate_blob_sas, BlobSasPermissions
 
 app = func.FunctionApp()
@@ -41,7 +40,6 @@ def upload(req: func.HttpRequest) -> func.HttpResponse:
 def start_ocr(req: func.HttpRequest) -> func.HttpResponse:
     data = req.get_json()
     blob_url = data.get("blob_url", "").strip()
-    filename = data.get("filename", "")
 
     endpoint = os.environ["DOCINTEL_ENDPOINT"].rstrip("/")
     key = os.environ["DOCINTEL_KEY"]
@@ -60,19 +58,18 @@ def start_ocr(req: func.HttpRequest) -> func.HttpResponse:
     )
 
     op = resp.headers.get("operation-location", "")
-
     return func.HttpResponse(op)
-
 @app.function_name(name="get_ocr_pdf")
 @app.route(route="get-ocr-pdf", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def get_ocr_pdf(req: func.HttpRequest) -> func.HttpResponse:
 
+    import requests
+    import json
     import re
-    from azure.storage.blob import BlobServiceClient
+    from azure.storage.blob import BlobServiceClient, generate_blob_sas, BlobSasPermissions
+    from datetime import datetime, timedelta
 
     op = req.params.get("op")
-    filename_input = req.params.get("filename", "")
-
     if not op:
         return func.HttpResponse("Missing op", status_code=400)
 
@@ -108,12 +105,7 @@ def get_ocr_pdf(req: func.HttpRequest) -> func.HttpResponse:
     blob_service = BlobServiceClient.from_connection_string(os.environ["AzureWebJobsStorage"])
 
     container = "outputs"
-
-    if filename_input:
-        base = filename_input.rsplit(".", 1)[0]
-        filename = f"{base}_ocr.pdf"
-    else:
-        filename = f"{result_id}_ocr.pdf"
+    filename = f"{result_id}.pdf"
 
     blob_client = blob_service.get_blob_client(container=container, blob=filename)
     blob_client.upload_blob(pdf_resp.content, overwrite=True)
