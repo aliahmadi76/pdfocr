@@ -1,101 +1,180 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title>PDF OCR Tool</title>
+
   <style>
-    body { font-family: Arial; padding: 30px; }
-    h2 { margin-bottom: 10px; }
-    button { padding: 10px 20px; margin-top: 10px; }
-    .file { margin-top: 10px; }
+    body {
+      font-family: Inter, Arial, sans-serif;
+      background: #f4f6f9;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 60px auto;
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: 24px;
+    }
+
+    p {
+      color: #666;
+      margin-bottom: 20px;
+    }
+
+    .upload-box {
+      border: 2px dashed #d0d5dd;
+      padding: 30px;
+      text-align: center;
+      border-radius: 10px;
+      background: #fafafa;
+      cursor: pointer;
+    }
+
+    .upload-box:hover {
+      background: #f1f5f9;
+    }
+
+    input[type=file] {
+      display: none;
+    }
+
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      margin-top: 20px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    .file-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 12px;
+      border-bottom: 1px solid #eee;
+      font-size: 14px;
+    }
+
+    .status {
+      font-weight: 500;
+    }
+
     .processing { color: orange; }
     .done { color: green; }
     .error { color: red; }
+
+    a {
+      text-decoration: none;
+      color: #2563eb;
+      font-weight: 500;
+    }
   </style>
 </head>
 
 <body>
 
-<h2>Bulk PDF OCR → Searchable PDFs</h2>
+<div class="container">
+  <h1>📄 PDF OCR Tool</h1>
+  <p>Upload PDFs to convert them into searchable PDFs (bulk supported)</p>
 
-<input type="file" id="files" multiple />
-<br/>
-<button onclick="processFiles()">Upload & Convert</button>
+  <div class="upload-box" onclick="document.getElementById('files').click()">
+    Click or drag files here
+    <input type="file" id="files" multiple />
+  </div>
 
-<h3>Results</h3>
-<div id="results"></div>
+  <button onclick="processFiles()">Upload & Convert</button>
+
+  <div id="results" style="margin-top: 30px;"></div>
+</div>
 
 <script>
-const BASE = "https://fn-pdfocr-api.azurewebsites.net";  // ✅ your function app
+const BASE = "https://fn-pdfocr-api.azurewebsites.net";
+
+function cleanName(name) {
+  return name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+}
 
 async function processFiles() {
   const files = document.getElementById("files").files;
   const results = document.getElementById("results");
 
   for (const file of files) {
+    const displayName = file.name;
+    const safeName = cleanName(file.name);
+
     const row = document.createElement("div");
-    row.className = "file processing";
-    row.innerText = file.name + " → uploading...";
+    row.className = "file-row";
+    row.innerHTML = `<span>${displayName}</span><span class="status processing">Uploading...</span>`;
     results.appendChild(row);
 
     try {
-      // ✅ 1. Get SAS upload URL
-      const sas = await fetch(`${BASE}/api/upload?filename=${encodeURIComponent(file.name)}`)
-        .then(r => {
-          if (!r.ok) throw new Error("Upload URL failed");
-          return r.text();
-        });
+      // ✅ Get upload URL
+      const sas = await fetch(`${BASE}/api/upload?filename=${encodeURIComponent(safeName)}`)
+        .then(r => r.text());
 
-      // ✅ 2. Upload file
-      const uploadResp = await fetch(sas, {
+      // ✅ Upload file
+      await fetch(sas, {
         method: "PUT",
         headers: { "x-ms-blob-type": "BlockBlob" },
         body: file
       });
 
-      if (!uploadResp.ok) throw new Error("Upload failed");
+      row.children[1].innerText = "Processing...";
 
-      row.innerText = file.name + " → starting OCR...";
-
-      // ✅ 3. Start OCR
+      // ✅ Start OCR
       const op = await fetch(`${BASE}/api/start-ocr`, {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
           blob_url: sas,
-          filename: file.name
+          filename: safeName
         })
-      }).then(r => {
-        if (!r.ok) throw new Error("OCR start failed");
-        return r.text();
-      });
+      }).then(r => r.text());
 
-      // ✅ 4. Poll result
+      // ✅ Poll
       let done = false;
 
       while (!done) {
         await new Promise(r => setTimeout(r, 2000));
 
         const res = await fetch(
-          `${BASE}/api/get-ocr-pdf?op=${encodeURIComponent(op)}&filename=${encodeURIComponent(file.name)}`
+          `${BASE}/api/get-ocr-pdf?op=${encodeURIComponent(op)}&filename=${encodeURIComponent(safeName)}`
         );
 
         const text = await res.text();
 
         if (text.startsWith("http")) {
           row.innerHTML = `
-            <span class="done">${file.name} ✅</span> 
-            <a href="${text}" target="_blank">Download</a>
-          `;
+            <span>${displayName}</span>
+            <span class="status done">
+              <a href="${text}" target="_blank">Download</a>
+            </span>`;
           done = true;
         } else {
-          row.innerText = file.name + " → processing...";
+          row.children[1].innerText = "Processing...";
         }
       }
 
     } catch (err) {
       console.error(err);
-      row.className = "file error";
-      row.innerText = file.name + " → ERROR";
+      row.children[1].innerText = "Error";
+      row.children[1].className = "status error";
     }
   }
 }

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>PDF OCR Tool</title>
+  <style>
+    body { font-family: Arial; padding: 30px; }
+    h2 { margin-bottom: 10px; }
+    button { padding: 10px 20px; margin-top: 10px; }
+    .file { margin-top: 10px; }
+    .processing { color: orange; }
+    .done { color: green; }
+    .error { color: red; }
+  </style>
+</head>
+
+<body>
+
+<h2>Bulk PDF OCR → Searchable PDFs</h2>
+
+<input type="file" id="files" multiple />
+<br/>
+<button onclick="processFiles()">Upload & Convert</button>
+
+<h3>Results</h3>
+<div id="results"></div>
+
+<script>
+const BASE = "https://fn-pdfocr-api.azurewebsites.net";  // ✅ your function app
+
+async function processFiles() {
+  const files = document.getElementById("files").files;
+  const results = document.getElementById("results");
+
+  for (const file of files) {
+    const row = document.createElement("div");
+    row.className = "file processing";
+    row.innerText = file.name + " → uploading...";
+    results.appendChild(row);
+
+    try {
+      // ✅ 1. Get SAS upload URL
+      const sas = await fetch(`${BASE}/api/upload?filename=${encodeURIComponent(file.name)}`)
+        .then(r => {
+          if (!r.ok) throw new Error("Upload URL failed");
+          return r.text();
+        });
+
+      // ✅ 2. Upload file
+      const uploadResp = await fetch(sas, {
+        method: "PUT",
+        headers: { "x-ms-blob-type": "BlockBlob" },
+        body: file
+      });
+
+      if (!uploadResp.ok) throw new Error("Upload failed");
+
+      row.innerText = file.name + " → starting OCR...";
+
+      // ✅ 3. Start OCR
+      const op = await fetch(`${BASE}/api/start-ocr`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          blob_url: sas,
+          filename: file.name
+        })
+      }).then(r => {
+        if (!r.ok) throw new Error("OCR start failed");
+        return r.text();
+      });
+
+      // ✅ 4. Poll result
+      let done = false;
+
+      while (!done) {
+        await new Promise(r => setTimeout(r, 2000));
+
+        const res = await fetch(
+          `${BASE}/api/get-ocr-pdf?op=${encodeURIComponent(op)}&filename=${encodeURIComponent(file.name)}`
+        );
+
+        const text = await res.text();
+
+        if (text.startsWith("http")) {
+          row.innerHTML = `
+            <span class="done">${file.name} ✅</span> 
+            <a href="${text}" target="_blank">Download</a>
+          `;
+          done = true;
+        } else {
+          row.innerText = file.name + " → processing...";
+        }
+      }
+
+    } catch (err) {
+      console.error(err);
+      row.className = "file error";
+      row.innerText = file.name + " → ERROR";
+    }
+  }
+}
+</script>
+
+</body>
+</html>
