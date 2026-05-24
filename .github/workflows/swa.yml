@@ -1,7 +1,13 @@
+name: Azure Static Web Apps CI/CD
+
 on:
   push:
     branches:
--on: ubuntu-latest      - main
+      - main
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -14,10 +20,6 @@ on:
           action: "upload"
 
           app_location: "app"
-          api_location: ""          # ✅ EMPTY (no SWA API)
+          api_location: ""          # ✅ using external Function App
           skip_api_build: true      # ✅ IMPORTANT
           output_location: ""
-``
-
-jobs:
-  build_and_deploy:
