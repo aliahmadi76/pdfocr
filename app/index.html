@@ -1,239 +1,438 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>PDF OCR Tool</title>
+  <title>FMA - PDF OCR Tool</title>
 
-  <!-- ✅ JSZip (Download All) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
   <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      font-family: Arial, sans-serif;
-      background: #f5f7fb;
-      margin: 0;
-      padding: 40px;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #111;
+      color: #eee;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px 20px;
     }
 
     .app {
-      max-width: 800px;
-      margin: auto;
+      width: 100%;
+      max-width: 850px;
     }
 
-    h1 {
+    /* ---- header ---- */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
       margin-bottom: 10px;
-      color: #1e40af;
     }
 
+    .header img {
+      height: 50px;
+    }
+
+    .header h1 {
+      font-size: 24px;
+      color: #00c853;
+    }
+
+    .subtitle {
+      color: #888;
+      font-size: 14px;
+      margin-bottom: 28px;
+    }
+
+    /* ---- dropzone ---- */
     .dropzone {
-      border: 2px dashed #bbb;
-      border-radius: 10px;
-      padding: 40px;
+      border: 2px dashed #444;
+      border-radius: 12px;
+      padding: 50px 20px;
       text-align: center;
-      background: white;
+      background: #1a1a1a;
+      cursor: pointer;
+      transition: 0.25s;
+    }
+
+    .dropzone:hover,
+    .dropzone.dragover {
+      border-color: #00c853;
+      background: #1f2e1f;
+    }
+
+    .dropzone-icon { font-size: 48px; }
+    .dropzone p { color: #aaa; font-size: 15px; margin-top: 8px; }
+    .dropzone small { color: #666; font-size: 12px; }
+
+    input[type=file] { display: none; }
+
+    /* ---- buttons ---- */
+    .btn-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    button {
+      border: none;
+      padding: 12px 22px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
       cursor: pointer;
       transition: 0.2s;
     }
 
-    .dropzone:hover {
-      background: #f0f4ff;
-    }
+    .btn-primary { background: #00c853; color: #111; }
+    .btn-primary:hover { background: #00e676; }
+    .btn-primary:disabled { background: #2e4830; color: #555; cursor: not-allowed; }
 
-    input {
-      display: none;
-    }
+    .btn-secondary { background: #1565c0; color: #fff; }
+    .btn-secondary:hover { background: #1e88e5; }
+    .btn-secondary:disabled { background: #1a2a3a; color: #555; cursor: not-allowed; }
 
-    button {
-      margin-top: 15px;
-      padding: 10px 20px;
-      border: none;
-      border-radius: 6px;
-      font-weight: bold;
-      cursor: pointer;
-    }
-
-    .btn-primary { background: #2563eb; color: white; }
-    .btn-green { background: #16a34a; color: white; }
+    /* ---- file list ---- */
+    .file-list { margin-top: 24px; }
 
     .file-card {
-      background: white;
-      border-radius: 8px;
-      padding: 12px;
-      margin-top: 10px;
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      background: #1a1a1a;
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin-bottom: 10px;
+      border: 1px solid #222;
     }
 
-    .progress {
+    .file-icon { font-size: 28px; margin-right: 14px; flex-shrink: 0; }
+
+    .file-info { flex: 1; min-width: 0; }
+
+    .file-name {
+      font-weight: 600;
+      font-size: 14px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #ddd;
+    }
+
+    .file-size { color: #666; font-size: 12px; }
+
+    /* ---- progress ---- */
+    .progress-wrap {
       height: 6px;
-      background: #ddd;
+      background: #333;
       border-radius: 3px;
-      margin-top: 5px;
+      margin-top: 6px;
       overflow: hidden;
     }
 
-    .bar {
+    .progress-bar {
       height: 100%;
+      border-radius: 3px;
       width: 0%;
-      transition: 0.4s;
+      transition: width 0.4s ease;
     }
 
-    .uploading { background: #3b82f6; width: 30%; }
-    .processing { background: orange; width: 70%; }
-    .done { background: green; width: 100%; }
-    .error { background: red; width: 100%; }
+    .progress-bar.uploading  { background: #42a5f5; width: 30%; }
+    .progress-bar.starting   { background: #ffa726; width: 50%; }
+    .progress-bar.processing { background: #ffa726; width: 75%; animation: pulse 1.2s infinite; }
+    .progress-bar.done       { background: #00c853; width: 100%; }
+    .progress-bar.error      { background: #ef5350; width: 100%; }
 
-    .status {
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* ---- status ---- */
+    .file-status {
+      margin-left: 14px;
+      flex-shrink: 0;
       font-size: 13px;
-      font-weight: bold;
+      font-weight: 600;
     }
 
-    a { color: #2563eb; text-decoration: none; }
+    .file-status a { color: #00c853; text-decoration: none; }
+    .file-status a:hover { text-decoration: underline; }
 
+    .status-uploading  { color: #42a5f5; }
+    .status-starting   { color: #ffa726; }
+    .status-processing { color: #ffa726; }
+    .status-done       { color: #00c853; }
+    .status-error      { color: #ef5350; }
+
+    /* ---- summary ---- */
+    .summary {
+      margin-top: 16px;
+      font-size: 13px;
+      color: #666;
+    }
+
+    /* ---- footer ---- */
+    .footer {
+      margin-top: 40px;
+      padding-top: 16px;
+      border-top: 1px solid #222;
+      text-align: center;
+      font-size: 12px;
+      color: #555;
+    }
+
+    .footer a { color: #00c853; text-decoration: none; }
   </style>
 </head>
-<body>
 
+<body>
 <div class="app">
 
-  <h1>PDF OCR Tool</h1>
-  <p>Upload PDFs → get searchable PDFs</p>
-
-  <div class="dropzone" onclick="fileInput.click()">
-    Drag & drop or click to upload
-    <input id="fileInput" type="file" multiple accept=".pdf">
+  <!-- Header with FMA logo -->
+  <div class="header">
+    <img src="https://www.nzshareholders.co.nz/wp-content/uploads/2021/10/fma.png"
+         alt="FMA Logo"
+         onerror="this.style.display='none'">
+    <h1>PDF OCR Tool</h1>
   </div>
 
-  <button class="btn-primary" onclick="processAll()">Upload & Convert</button>
-  <button class="btn-green" onclick="downloadAll()" id="downloadAll" disabled>
-    Download All
-  </button>
+  <p class="subtitle">Upload scanned PDFs and convert them into searchable PDFs (bulk supported)</p>
 
-  <div id="results"></div>
+  <!-- Drop zone -->
+  <div class="dropzone" id="dropzone">
+    <div class="dropzone-icon">&#128196;</div>
+    <p>Drag & drop PDF files here</p>
+    <small>or click to browse</small>
+    <input type="file" id="fileInput" multiple accept=".pdf" />
+  </div>
+
+  <!-- Buttons -->
+  <div class="btn-row">
+    <button class="btn-primary" id="btnProcess" disabled onclick="processAll()">Upload & Convert</button>
+    <button class="btn-secondary" id="btnDownloadAll" disabled onclick="downloadAll()">Download All (.zip)</button>
+  </div>
+
+  <!-- File list -->
+  <div class="file-list" id="fileList"></div>
+  <div class="summary" id="summary"></div>
+
+  <!-- Footer -->
+  <div class="footer">
+    Developed by <strong>Ali Ahmadi</strong> | FMA Technical Operations
+  </div>
 
 </div>
 
 <script>
+// ============================================================
+//  CONFIG
+// ============================================================
 const BASE = "https://fn-pdfocr-api.azurewebsites.net";
 
-let files = [];
-let results = [];
+// ============================================================
+//  STATE
+// ============================================================
+let selectedFiles = [];
+let completedDownloads = [];
 
-// ===== FILE SELECT =====
-document.getElementById("fileInput").addEventListener("change", e => {
-  files = [...e.target.files];
-  render();
+// ============================================================
+//  DROP ZONE
+// ============================================================
+const dz  = document.getElementById("dropzone");
+const inp = document.getElementById("fileInput");
+
+dz.addEventListener("click", () => inp.click());
+
+["dragenter", "dragover"].forEach(e =>
+  dz.addEventListener(e, ev => { ev.preventDefault(); dz.classList.add("dragover"); })
+);
+["dragleave", "drop"].forEach(e =>
+  dz.addEventListener(e, ev => { ev.preventDefault(); dz.classList.remove("dragover"); })
+);
+
+dz.addEventListener("drop", ev => {
+  const files = [...ev.dataTransfer.files].filter(f => f.name.toLowerCase().endsWith(".pdf"));
+  addFiles(files);
 });
 
-// ===== RENDER UI =====
-function render() {
-  const container = document.getElementById("results");
-  container.innerHTML = "";
+inp.addEventListener("change", () => {
+  addFiles([...inp.files]);
+  inp.value = "";
+});
 
+function addFiles(files) {
   for (const f of files) {
-    const safe = f.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+    if (!selectedFiles.find(s => s.name === f.name && s.size === f.size)) {
+      selectedFiles.push(f);
+    }
+  }
+  renderFileList();
+  document.getElementById("btnProcess").disabled = selectedFiles.length === 0;
+}
 
-    const div = document.createElement("div");
-    div.className = "file-card";
-    div.id = safe;
+// ============================================================
+//  RENDER
+// ============================================================
+function renderFileList() {
+  const list = document.getElementById("fileList");
+  list.innerHTML = "";
 
-    div.innerHTML = `
-      <div style="flex:1">
-        <div>${f.name}</div>
-        <div class="progress"><div class="bar"></div></div>
+  for (const f of selectedFiles) {
+    const card = document.createElement("div");
+    card.className = "file-card";
+    card.id = "card-" + safeName(f.name);
+    card.innerHTML = `
+      <div class="file-icon">&#128196;</div>
+      <div class="file-info">
+        <div class="file-name">${f.name}</div>
+        <div class="file-size">${(f.size / 1024).toFixed(1)} KB</div>
+        <div class="progress-wrap"><div class="progress-bar" id="bar-${safeName(f.name)}"></div></div>
       </div>
-      <div class="status">Ready</div>
+      <div class="file-status" id="status-${safeName(f.name)}">Ready</div>
     `;
-
-    container.appendChild(div);
+    list.appendChild(card);
   }
 }
 
-// ===== PROCESS ALL =====
+// ============================================================
+//  HELPERS
+// ============================================================
+function safeName(name) {
+  return name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+}
+
+function setStatus(file, phase, html) {
+  const bar = document.getElementById("bar-" + safeName(file.name));
+  const st  = document.getElementById("status-" + safeName(file.name));
+  if (bar) bar.className = "progress-bar " + phase;
+  if (st)  { st.className = "file-status status-" + phase; st.innerHTML = html; }
+}
+
+function updateSummary() {
+  const total = selectedFiles.length;
+  const done  = completedDownloads.length;
+  document.getElementById("summary").innerText = `${done} / ${total} completed`;
+  document.getElementById("btnDownloadAll").disabled = done === 0;
+}
+
+// ============================================================
+//  PROCESS ALL (concurrent, up to 3)
+// ============================================================
 async function processAll() {
-  for (const file of files) {
-    await processFile(file);
+  document.getElementById("btnProcess").disabled = true;
+  completedDownloads = [];
+  updateSummary();
+
+  const queue = [...selectedFiles];
+  const workers = [];
+  const concurrency = 3;
+
+  for (let i = 0; i < Math.min(concurrency, queue.length); i++) {
+    workers.push(runWorker(queue));
+  }
+
+  await Promise.all(workers);
+  document.getElementById("btnProcess").disabled = false;
+}
+
+async function runWorker(queue) {
+  while (queue.length > 0) {
+    const file = queue.shift();
+    await processOne(file);
   }
 }
 
-// ===== PROCESS ONE =====
-async function processFile(file) {
-
-  const safe = file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
-  const row = document.getElementById(safe);
-  const bar = row.querySelector(".bar");
-  const status = row.querySelector(".status");
+async function processOne(file) {
+  const safe = safeName(file.name);
 
   try {
+    // 1. Get SAS URL
+    setStatus(file, "uploading", "Uploading...");
+    const sasResp = await fetch(`${BASE}/api/upload?filename=${encodeURIComponent(safe)}`);
+    if (!sasResp.ok) throw new Error("SAS failed");
+    const sas = await sasResp.text();
 
-    // 1 Upload
-    bar.className = "bar uploading";
-    status.innerText = "Uploading...";
-
-    const sas = await fetch(`${BASE}/api/upload?filename=${encodeURIComponent(safe)}`)
-      .then(r => r.text());
-
-    await fetch(sas, {
+    // 2. Upload file
+    const upResp = await fetch(sas, {
       method: "PUT",
       headers: { "x-ms-blob-type": "BlockBlob" },
       body: file
     });
+    if (!upResp.ok) throw new Error("Upload failed");
 
-    // 2 OCR
-    bar.className = "bar processing";
-    status.innerText = "Processing...";
-
-    const op = await fetch(`${BASE}/api/start-ocr`, {
+    // 3. Start OCR
+    setStatus(file, "starting", "Starting OCR...");
+    const ocrResp = await fetch(`${BASE}/api/start-ocr`, {
       method: "POST",
-      headers: {"Content-Type": "application/json"},
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ blob_url: sas, filename: safe })
-    }).then(r => r.text());
+    });
+    if (!ocrResp.ok) throw new Error("OCR start failed");
+    const op = await ocrResp.text();
 
-    let url = null;
+    // 4. Poll for result
+    setStatus(file, "processing", "Processing...");
+    let downloadUrl = null;
 
-    while (!url) {
-      await new Promise(r => setTimeout(r, 2000));
-
-      const res = await fetch(
+    while (!downloadUrl) {
+      await new Promise(r => setTimeout(r, 2500));
+      const pollResp = await fetch(
         `${BASE}/api/get-ocr-pdf?op=${encodeURIComponent(op)}&filename=${encodeURIComponent(safe)}`
       );
-
-      const txt = await res.text();
-      if (txt.startsWith("http")) url = txt;
+      const text = await pollResp.text();
+      if (text.startsWith("http")) {
+        downloadUrl = text;
+      }
     }
 
-    // 3 Done
-    bar.className = "bar done";
-    status.innerHTML = `<a href="${url}" target="_blank">Download</a>`;
+    // 5. Done
+    const outName = safe.replace(/\.pdf$/i, "") + "_ocr.pdf";
+    completedDownloads.push({ name: outName, url: downloadUrl });
+    setStatus(file, "done", `<a href="${downloadUrl}" target="_blank">Download</a>`);
 
-    results.push({ name: safe, url });
-
-    document.getElementById("downloadAll").disabled = false;
-
-  } catch (e) {
-    console.error(e);
-    bar.className = "bar error";
-    status.innerText = "Error";
+  } catch (err) {
+    console.error(file.name, err);
+    setStatus(file, "error", "Error");
   }
+
+  updateSummary();
 }
 
-// ===== DOWNLOAD ALL =====
+// ============================================================
+//  DOWNLOAD ALL AS ZIP
+// ============================================================
 async function downloadAll() {
-  const zip = new JSZip();
+  if (completedDownloads.length === 0) return;
 
-  for (const f of results) {
-    const resp = await fetch(f.url);
-    const blob = await resp.blob();
-    zip.file(f.name, blob);
+  document.getElementById("btnDownloadAll").disabled = true;
+  document.getElementById("btnDownloadAll").innerText = "Zipping...";
+
+  try {
+    const zip = new JSZip();
+
+    for (const item of completedDownloads) {
+      const resp = await fetch(item.url);
+      const blob = await resp.blob();
+      zip.file(item.name, blob);
+    }
+
+    const content = await zip.generateAsync({ type: "blob" });
+    saveAs(content, "ocr_results.zip");
+
+  } catch (err) {
+    console.error("ZIP error:", err);
+    alert("Failed to create ZIP. You can still download files individually.");
   }
 
-  const content = await zip.generateAsync({ type: "blob" });
-  saveAs(content, "ocr_results.zip");
+  document.getElementById("btnDownloadAll").disabled = false;
+  document.getElementById("btnDownloadAll").innerText = "Download All (.zip)";
 }
 </script>
 
 </body>
 </html>
-``

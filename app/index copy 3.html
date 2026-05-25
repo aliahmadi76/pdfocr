@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>PDF OCR Tool</title>
+
+  <!-- ✅ JSZip (Download All) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f7fb;
+      margin: 0;
+      padding: 40px;
+    }
+
+    .app {
+      max-width: 800px;
+      margin: auto;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+      color: #1e40af;
+    }
+
+    .dropzone {
+      border: 2px dashed #bbb;
+      border-radius: 10px;
+      padding: 40px;
+      text-align: center;
+      background: white;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .dropzone:hover {
+      background: #f0f4ff;
+    }
+
+    input {
+      display: none;
+    }
+
+    button {
+      margin-top: 15px;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .btn-primary { background: #2563eb; color: white; }
+    .btn-green { background: #16a34a; color: white; }
+
+    .file-card {
+      background: white;
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .progress {
+      height: 6px;
+      background: #ddd;
+      border-radius: 3px;
+      margin-top: 5px;
+      overflow: hidden;
+    }
+
+    .bar {
+      height: 100%;
+      width: 0%;
+      transition: 0.4s;
+    }
+
+    .uploading { background: #3b82f6; width: 30%; }
+    .processing { background: orange; width: 70%; }
+    .done { background: green; width: 100%; }
+    .error { background: red; width: 100%; }
+
+    .status {
+      font-size: 13px;
+      font-weight: bold;
+    }
+
+    a { color: #2563eb; text-decoration: none; }
+
+  </style>
+</head>
+<body>
+
+<div class="app">
+
+  <h1>PDF OCR Tool</h1>
+  <p>Upload PDFs → get searchable PDFs</p>
+
+  <div class="dropzone" onclick="fileInput.click()">
+    Drag & drop or click to upload
+    <input id="fileInput" type="file" multiple accept=".pdf">
+  </div>
+
+  <button class="btn-primary" onclick="processAll()">Upload & Convert</button>
+  <button class="btn-green" onclick="downloadAll()" id="downloadAll" disabled>
+    Download All
+  </button>
+
+  <div id="results"></div>
+
+</div>
+
+<script>
+const BASE = "https://fn-pdfocr-api.azurewebsites.net";
+
+let files = [];
+let results = [];
+
+// ===== FILE SELECT =====
+document.getElementById("fileInput").addEventListener("change", e => {
+  files = [...e.target.files];
+  render();
+});
+
+// ===== RENDER UI =====
+function render() {
+  const container = document.getElementById("results");
+  container.innerHTML = "";
+
+  for (const f of files) {
+    const safe = f.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+
+    const div = document.createElement("div");
+    div.className = "file-card";
+    div.id = safe;
+
+    div.innerHTML = `
+      <div style="flex:1">
+        <div>${f.name}</div>
+        <div class="progress"><div class="bar"></div></div>
+      </div>
+      <div class="status">Ready</div>
+    `;
+
+    container.appendChild(div);
+  }
+}
+
+// ===== PROCESS ALL =====
+async function processAll() {
+  for (const file of files) {
+    await processFile(file);
+  }
+}
+
+// ===== PROCESS ONE =====
+async function processFile(file) {
+
+  const safe = file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+  const row = document.getElementById(safe);
+  const bar = row.querySelector(".bar");
+  const status = row.querySelector(".status");
+
+  try {
+
+    // 1 Upload
+    bar.className = "bar uploading";
+    status.innerText = "Uploading...";
+
+    const sas = await fetch(`${BASE}/api/upload?filename=${encodeURIComponent(safe)}`)
+      .then(r => r.text());
+
+    await fetch(sas, {
+      method: "PUT",
+      headers: { "x-ms-blob-type": "BlockBlob" },
+      body: file
+    });
+
+    // 2 OCR
+    bar.className = "bar processing";
+    status.innerText = "Processing...";
+
+    const op = await fetch(`${BASE}/api/start-ocr`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ blob_url: sas, filename: safe })
+    }).then(r => r.text());
+
+    let url = null;
+
+    while (!url) {
+      await new Promise(r => setTimeout(r, 2000));
+
+      const res = await fetch(
+        `${BASE}/api/get-ocr-pdf?op=${encodeURIComponent(op)}&filename=${encodeURIComponent(safe)}`
+      );
+
+      const txt = await res.text();
+      if (txt.startsWith("http")) url = txt;
+    }
+
+    // 3 Done
+    bar.className = "bar done";
+    status.innerHTML = `<a href="${url}" target="_blank">Download</a>`;
+
+    results.push({ name: safe, url });
+
+    document.getElementById("downloadAll").disabled = false;
+
+  } catch (e) {
+    console.error(e);
+    bar.className = "bar error";
+    status.innerText = "Error";
+  }
+}
+
+// ===== DOWNLOAD ALL =====
+async function downloadAll() {
+  const zip = new JSZip();
+
+  for (const f of results) {
+    const resp = await fetch(f.url);
+    const blob = await resp.blob();
+    zip.file(f.name, blob);
+  }
+
+  const content = await zip.generateAsync({ type: "blob" });
+  saveAs(content, "ocr_results.zip");
+}
+</script>
+
+</body>
+</html>
+``
