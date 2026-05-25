@@ -1,0 +1,9 @@
+{
+  "routes": [
+    {
+      "route": "/api/*",
+      "allowedRoles": ["anonymous"],
+      "rewrite": "https://fn-pdfocr-api.azurewebsites.net/api/{*}"
+    }
+  ]
+}
