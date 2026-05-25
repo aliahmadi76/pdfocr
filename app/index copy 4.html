@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <title>FMA - PDF OCR Tool</title>
 
-  https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js
-  eSaver.js/2.0.5/FileSaver.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -21,14 +21,33 @@
       padding: 40px 20px 20px;
     }
 
-    .app { width: 100%; max-width: 850px; }
+    .app {
+      width: 100%;
+      max-width: 850px;
+    }
 
     /* ---- header ---- */
-    .header { display: flex; align-items: center; gap: 16px; margin-bottom: 10px; }
-    .header img { height: 50px; }
-    .header h1 { font-size: 24px; color: #00c853; }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 10px;
+    }
 
-    .subtitle { color: #888; font-size: 14px; margin-bottom: 28px; }
+    .header img {
+      height: 50px;
+    }
+
+    .header h1 {
+      font-size: 24px;
+      color: #00c853;
+    }
+
+    .subtitle {
+      color: #888;
+      font-size: 14px;
+      margin-bottom: 28px;
+    }
 
     /* ---- dropzone ---- */
     .dropzone {
@@ -41,7 +60,8 @@
       transition: 0.25s;
     }
 
-    .dropzone:hover, .dropzone.dragover {
+    .dropzone:hover,
+    .dropzone.dragover {
       border-color: #00c853;
       background: #1f2e1f;
     }
@@ -53,7 +73,11 @@
     input[type=file] { display: none; }
 
     /* ---- buttons ---- */
-    .btn-row { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+    .btn-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+    }
 
     button {
       border: none;
@@ -73,9 +97,6 @@
     .btn-secondary:hover { background: #1e88e5; }
     .btn-secondary:disabled { background: #1a2a3a; color: #555; cursor: not-allowed; }
 
-    .btn-folder { background: #ff6f00; color: #fff; }
-    .btn-folder:hover { background: #ff8f00; }
-
     /* ---- file list ---- */
     .file-list { margin-top: 24px; }
 
@@ -94,24 +115,30 @@
     .file-info { flex: 1; min-width: 0; }
 
     .file-name {
-      font-weight: 600; font-size: 14px;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      font-weight: 600;
+      font-size: 14px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
       color: #ddd;
     }
-
-    .file-path { color: #555; font-size: 11px; margin-top: 2px; }
 
     .file-size { color: #666; font-size: 12px; }
 
     /* ---- progress ---- */
     .progress-wrap {
-      height: 6px; background: #333;
-      border-radius: 3px; margin-top: 6px; overflow: hidden;
+      height: 6px;
+      background: #333;
+      border-radius: 3px;
+      margin-top: 6px;
+      overflow: hidden;
     }
 
     .progress-bar {
-      height: 100%; border-radius: 3px;
-      width: 0%; transition: width 0.4s ease;
+      height: 100%;
+      border-radius: 3px;
+      width: 0%;
+      transition: width 0.4s ease;
     }
 
     .progress-bar.uploading  { background: #42a5f5; width: 30%; }
@@ -127,8 +154,10 @@
 
     /* ---- status ---- */
     .file-status {
-      margin-left: 14px; flex-shrink: 0;
-      font-size: 13px; font-weight: 600;
+      margin-left: 14px;
+      flex-shrink: 0;
+      font-size: 13px;
+      font-weight: 600;
     }
 
     .file-status a { color: #00c853; text-decoration: none; }
@@ -141,42 +170,49 @@
     .status-error      { color: #ef5350; }
 
     /* ---- summary ---- */
-    .summary { margin-top: 16px; font-size: 13px; color: #666; }
+    .summary {
+      margin-top: 16px;
+      font-size: 13px;
+      color: #666;
+    }
 
     /* ---- footer ---- */
     .footer {
-      margin-top: 40px; padding-top: 16px;
+      margin-top: 40px;
+      padding-top: 16px;
       border-top: 1px solid #222;
-      text-align: center; font-size: 12px; color: #555;
+      text-align: center;
+      font-size: 12px;
+      color: #555;
     }
+
+    .footer a { color: #00c853; text-decoration: none; }
   </style>
 </head>
 
 <body>
 <div class="app">
 
-  <!-- Header -->
+  <!-- Header with FMA logo -->
   <div class="header">
-    .co.nz/wp-content/uploads/2021/10/fma.png" onerror="this.style.display='none'">
+    <img src="https://www.nzshareholders.co.nz/wp-content/uploads/2021/10/fma.png"
+         alt="FMA Logo"
+         onerror="this.style.display='none'">
     <h1>PDF OCR Tool</h1>
   </div>
 
-  <p class="subtitle">Upload individual PDFs or select an entire folder to bulk-convert into searchable PDFs</p>
+  <p class="subtitle">Upload scanned PDFs and convert them into searchable PDFs (bulk supported)</p>
 
-  <!-- Drop zone (individual files) -->
+  <!-- Drop zone -->
   <div class="dropzone" id="dropzone">
     <div class="dropzone-icon">&#128196;</div>
     <p>Drag & drop PDF files here</p>
-    <small>or click to browse individual files</small>
+    <small>or click to browse</small>
     <input type="file" id="fileInput" multiple accept=".pdf" />
   </div>
 
-  <!-- Hidden folder input -->
-  <input type="file" id="folderInput" webkitdirectory directory multiple />
-
   <!-- Buttons -->
   <div class="btn-row">
-    <button class="btn-folder" onclick="document.getElementById('folderInput').click()">Select Folder</button>
     <button class="btn-primary" id="btnProcess" disabled onclick="processAll()">Upload & Convert</button>
     <button class="btn-secondary" id="btnDownloadAll" disabled onclick="downloadAll()">Download All (.zip)</button>
   </div>
@@ -201,11 +237,11 @@ const BASE = "https://fn-pdfocr-api.azurewebsites.net";
 // ============================================================
 //  STATE
 // ============================================================
-let selectedFiles = [];        // { file, relativePath, displayName }
-let completedDownloads = [];   // { name, url }
+let selectedFiles = [];
+let completedDownloads = [];
 
 // ============================================================
-//  DROP ZONE (individual files)
+//  DROP ZONE
 // ============================================================
 const dz  = document.getElementById("dropzone");
 const inp = document.getElementById("fileInput");
@@ -221,94 +257,44 @@ dz.addEventListener("click", () => inp.click());
 
 dz.addEventListener("drop", ev => {
   const files = [...ev.dataTransfer.files].filter(f => f.name.toLowerCase().endsWith(".pdf"));
-  addFiles(files, "");
+  addFiles(files);
 });
 
 inp.addEventListener("change", () => {
-  addFiles([...inp.files], "");
+  addFiles([...inp.files]);
   inp.value = "";
 });
 
-// ============================================================
-//  FOLDER INPUT
-// ============================================================
-document.getElementById("folderInput").addEventListener("change", ev => {
-  const allFiles = [...ev.target.files];
-  const pdfs = allFiles.filter(f => f.name.toLowerCase().endsWith(".pdf"));
-
-  for (const f of pdfs) {
-    const path = f.webkitRelativePath || "";
-    const alreadyAdded = selectedFiles.find(
-      s => s.relativePath === path && s.file.size === f.size
-    );
-
-    if (!alreadyAdded) {
-      selectedFiles.push({
-        file: f,
-        relativePath: path,
-        displayName: f.name
-      });
-    }
-  }
-
-  renderFileList();
-  document.getElementById("btnProcess").disabled = selectedFiles.length === 0;
-  ev.target.value = "";
-});
-
-// ============================================================
-//  ADD FILES (from drag-drop or file picker)
-// ============================================================
-function addFiles(files, basePath) {
+function addFiles(files) {
   for (const f of files) {
-    const path = basePath ? basePath + "/" + f.name : f.name;
-    const alreadyAdded = selectedFiles.find(
-      s => s.displayName === f.name && s.file.size === f.size
-    );
-
-    if (!alreadyAdded) {
-      selectedFiles.push({
-        file: f,
-        relativePath: path,
-        displayName: f.name
-      });
+    if (!selectedFiles.find(s => s.name === f.name && s.size === f.size)) {
+      selectedFiles.push(f);
     }
   }
-
   renderFileList();
   document.getElementById("btnProcess").disabled = selectedFiles.length === 0;
 }
 
 // ============================================================
-//  RENDER FILE LIST
+//  RENDER
 // ============================================================
 function renderFileList() {
   const list = document.getElementById("fileList");
   list.innerHTML = "";
 
-  for (const item of selectedFiles) {
-    const safe = safeName(item.displayName);
-
+  for (const f of selectedFiles) {
     const card = document.createElement("div");
     card.className = "file-card";
-    card.id = "card-" + safe + "-" + item.file.size;
-
-    const pathLabel = item.relativePath && item.relativePath !== item.displayName
-      ? `<div class="file-path">${item.relativePath}</div>` : "";
-
+    card.id = "card-" + safeName(f.name);
     card.innerHTML = `
       <div class="file-icon">&#128196;</div>
       <div class="file-info">
-        <div class="file-name">${item.displayName}</div>
-        ${pathLabel}
-        <div class="file-size">${(item.file.size / 1024).toFixed(1)} KB</div>
-        <div class="progress-wrap">
-          <div class="progress-bar" id="bar-${safe}-${item.file.size}"></div>
-        </div>
+        <div class="file-name">${f.name}</div>
+        <div class="file-size">${(f.size / 1024).toFixed(1)} KB</div>
+        <div class="progress-wrap"><div class="progress-bar" id="bar-${safeName(f.name)}"></div></div>
       </div>
-      <div class="file-status" id="status-${safe}-${item.file.size}">Ready</div>
+      <div class="file-status" id="status-${safeName(f.name)}">Ready</div>
     `;
-
     list.appendChild(card);
   }
 }
@@ -320,14 +306,9 @@ function safeName(name) {
   return name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
 }
 
-function getCardId(item) {
-  return safeName(item.displayName) + "-" + item.file.size;
-}
-
-function setStatus(item, phase, html) {
-  const id = getCardId(item);
-  const bar = document.getElementById("bar-" + id);
-  const st  = document.getElementById("status-" + id);
+function setStatus(file, phase, html) {
+  const bar = document.getElementById("bar-" + safeName(file.name));
+  const st  = document.getElementById("status-" + safeName(file.name));
   if (bar) bar.className = "progress-bar " + phase;
   if (st)  { st.className = "file-status status-" + phase; st.innerHTML = html; }
 }
@@ -361,17 +342,17 @@ async function processAll() {
 
 async function runWorker(queue) {
   while (queue.length > 0) {
-    const item = queue.shift();
-    await processOne(item);
+    const file = queue.shift();
+    await processOne(file);
   }
 }
 
-async function processOne(item) {
-  const safe = safeName(item.displayName);
+async function processOne(file) {
+  const safe = safeName(file.name);
 
   try {
     // 1. Get SAS URL
-    setStatus(item, "uploading", "Uploading...");
+    setStatus(file, "uploading", "Uploading...");
     const sasResp = await fetch(`${BASE}/api/upload?filename=${encodeURIComponent(safe)}`);
     if (!sasResp.ok) throw new Error("SAS failed");
     const sas = await sasResp.text();
@@ -380,12 +361,12 @@ async function processOne(item) {
     const upResp = await fetch(sas, {
       method: "PUT",
       headers: { "x-ms-blob-type": "BlockBlob" },
-      body: item.file
+      body: file
     });
     if (!upResp.ok) throw new Error("Upload failed");
 
     // 3. Start OCR
-    setStatus(item, "starting", "Starting OCR...");
+    setStatus(file, "starting", "Starting OCR...");
     const ocrResp = await fetch(`${BASE}/api/start-ocr`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -395,7 +376,7 @@ async function processOne(item) {
     const op = await ocrResp.text();
 
     // 4. Poll for result
-    setStatus(item, "processing", "Processing...");
+    setStatus(file, "processing", "Processing...");
     let downloadUrl = null;
 
     while (!downloadUrl) {
@@ -409,29 +390,21 @@ async function processOne(item) {
       }
     }
 
-    // 5. Done — preserve folder structure in output name
+    // 5. Done
     const outName = safe.replace(/\.pdf$/i, "") + "_ocr.pdf";
-
-    // Build output path (preserving folder structure)
-    let outputPath = outName;
-    if (item.relativePath && item.relativePath.includes("/")) {
-      const folder = item.relativePath.substring(0, item.relativePath.lastIndexOf("/"));
-      outputPath = folder + "/" + outName;
-    }
-
-    completedDownloads.push({ name: outputPath, url: downloadUrl });
-    setStatus(item, "done", `<a href="${downloadUrl}" target="_blank">Download</a>`);
+    completedDownloads.push({ name: outName, url: downloadUrl });
+    setStatus(file, "done", `<a href="${downloadUrl}" target="_blank">Download</a>`);
 
   } catch (err) {
-    console.error(item.displayName, err);
-    setStatus(item, "error", "Error");
+    console.error(file.name, err);
+    setStatus(file, "error", "Error");
   }
 
   updateSummary();
 }
 
 // ============================================================
-//  DOWNLOAD ALL AS ZIP (preserves folder structure)
+//  DOWNLOAD ALL AS ZIP
 // ============================================================
 async function downloadAll() {
   if (completedDownloads.length === 0) return;
@@ -445,8 +418,6 @@ async function downloadAll() {
     for (const item of completedDownloads) {
       const resp = await fetch(item.url);
       const blob = await resp.blob();
-
-      // Folder structure preserved inside ZIP
       zip.file(item.name, blob);
     }
 
