@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>PDF OCR Tool</title>
+
+  <style>
+    body {
+      font-family: Inter, Arial, sans-serif;
+      background: #f4f6f9;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 60px auto;
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: 24px;
+    }
+
+    p {
+      color: #666;
+      margin-bottom: 20px;
+    }
+
+    .upload-box {
+      border: 2px dashed #d0d5dd;
+      padding: 30px;
+      text-align: center;
+      border-radius: 10px;
+      background: #fafafa;
+      cursor: pointer;
+    }
+
+    .upload-box:hover {
+      background: #f1f5f9;
+    }
+
+    input[type=file] {
+      display: none;
+    }
+
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      margin-top: 20px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    .file-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 12px;
+      border-bottom: 1px solid #eee;
+      font-size: 14px;
+    }
+
+    .status {
+      font-weight: 500;
+    }
+
+    .processing { color: orange; }
+    .done { color: green; }
+    .error { color: red; }
+
+    a {
+      text-decoration: none;
+      color: #2563eb;
+      font-weight: 500;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+  <h1>📄 PDF OCR Tool</h1>
+  <p>Upload PDFs to convert them into searchable PDFs (bulk supported)</p>
+
+  <div class="upload-box" onclick="document.getElementById('files').click()">
+    Click or drag files here
+    <input type="file" id="files" multiple />
+  </div>
+
+  <button onclick="processFiles()">Upload & Convert</button>
+
+  <div id="results" style="margin-top: 30px;"></div>
+</div>
+
+<script>
+const BASE = "https://fn-pdfocr-api.azurewebsites.net";
+
+function cleanName(name) {
+  return name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+}
+
+async function processFiles() {
+  const files = document.getElementById("files").files;
+  const results = document.getElementById("results");
+
+  for (const file of files) {
+    const displayName = file.name;
+    const safeName = cleanName(file.name);
+
+    const row = document.createElement("div");
+    row.className = "file-row";
+    row.innerHTML = `<span>${displayName}</span><span class="status processing">Uploading...</span>`;
+    results.appendChild(row);
+
+    try {
+      // ✅ Get upload URL
+      const sas = await fetch(`${BASE}/api/upload?filename=${encodeURIComponent(safeName)}`)
+        .then(r => r.text());
+
+      // ✅ Upload file
+      await fetch(sas, {
+        method: "PUT",
+        headers: { "x-ms-blob-type": "BlockBlob" },
+        body: file
+      });
+
+      row.children[1].innerText = "Processing...";
+
+      // ✅ Start OCR
+      const op = await fetch(`${BASE}/api/start-ocr`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          blob_url: sas,
+          filename: safeName
+        })
+      }).then(r => r.text());
+
+      // ✅ Poll
+      let done = false;
+
+      while (!done) {
+        await new Promise(r => setTimeout(r, 2000));
+
+        const res = await fetch(
+          `${BASE}/api/get-ocr-pdf?op=${encodeURIComponent(op)}&filename=${encodeURIComponent(safeName)}`
+        );
+
+        const text = await res.text();
+
+        if (text.startsWith("http")) {
+          row.innerHTML = `
+            <span>${displayName}</span>
+            <span class="status done">
+              <a href="${text}" target="_blank">Download</a>
+            </span>`;
+          done = true;
+        } else {
+          row.children[1].innerText = "Processing...";
+        }
+      }
+
+    } catch (err) {
+      console.error(err);
+      row.children[1].innerText = "Error";
+      row.children[1].className = "status error";
+    }
+  }
+}
+</script>
+
+</body>
+</html>
