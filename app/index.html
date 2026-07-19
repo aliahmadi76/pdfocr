@@ -447,7 +447,11 @@ async function processOne(item) {
     error: ""
   });
 
-  setStatus(  item,  "done    `${downloadUrl}📥 Download</a>`);
+   setStatus(  
+    item,
+    "done",
+    `${downloadUrl}📥 Download</a>`
+  );
 
 } catch (err) {   
 	processingLog.push({    
