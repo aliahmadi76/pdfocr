@@ -204,8 +204,6 @@ const BASE = "https://fn-pdfocr-api.azurewebsites.net";
 // ============================================================
 let selectedFiles = [];        // { file, relativePath, displayName }
 let completedDownloads = [];   // { name, url }
-let processingLog = [];        // OCR processing log
-let currentJobId = null;
 
 // ============================================================
 //  DROP ZONE (individual files)
@@ -337,18 +335,10 @@ function setStatus(item, phase, html) {
 
 function updateSummary() {
   const total = selectedFiles.length;
-  const successful = processingLog.filter(
-    x => x.status === "SUCCESS"
-  ).length;
-  const failed = processingLog.filter(
-    x => x.status === "FAILED"  
-  ).length;
-  document.getElementById("summary").innerText =    
-    `Successful: ${successful} | Failed: ${failed} | Total: ${total}`;
-  
-  document.getElementById("btnDownloadAll").disabled = completedDownloads.length === 0;
+  const done  = completedDownloads.length;
+  document.getElementById("summary").innerText = `${done} / ${total} completed`;
+  document.getElementById("btnDownloadAll").disabled = done === 0;
 }
-
 
 // ============================================================
 //  PROCESS ALL (concurrent, up to 3)
@@ -356,12 +346,6 @@ function updateSummary() {
 async function processAll() {
   document.getElementById("btnProcess").disabled = true;
   completedDownloads = [];
-  processingLog = [];
-
-  currentJobId = new Date()
-    .toISOString()
-    .replace(/[:.]/g, "-");
-  
   updateSummary();
 
   const queue = [...selectedFiles];
@@ -385,7 +369,6 @@ async function runWorker(queue) {
 
 async function processOne(item) {
   const safe = safeName(item.displayName);
-  const startTime = new Date();
 
   try {
     // 1. Get SAS URL
@@ -407,7 +390,7 @@ async function processOne(item) {
     const ocrResp = await fetch(`${BASE}/api/start-ocr`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ blob_url: sas, filename: safe, job_id: currentJobId })
+      body: JSON.stringify({ blob_url: sas, filename: safe })
     });
     if (!ocrResp.ok) throw new Error("OCR start failed");
     const op = await ocrResp.text();
@@ -419,7 +402,7 @@ async function processOne(item) {
     while (!downloadUrl) {
       await new Promise(r => setTimeout(r, 2500));
       const pollResp = await fetch(
-        `${BASE}/api/get-ocr-pdf?op=${encodeURIComponent(op)}&filename=${encodeURIComponent(safe)}&job_id=${encodeURIComponent(currentJobId)}`
+        `${BASE}/api/get-ocr-pdf?op=${encodeURIComponent(op)}&filename=${encodeURIComponent(safe)}`
       );
       const text = await pollResp.text();
       if (text.startsWith("http")) {
@@ -428,9 +411,8 @@ async function processOne(item) {
     }
 
     // 5. Done — preserve folder structure in output name
-    //Now Preserve the original filename
-    //const outName = safe.replace(/\.pdf$/i, "") + "_ocr.pdf";
-    const outName = item.displayName;
+    const outName = safe.replace(/\.pdf$/i, "") + "_ocr.pdf";
+
     // Build output path (preserving folder structure)
     let outputPath = outName;
     if (item.relativePath && item.relativePath.includes("/")) {
@@ -438,46 +420,13 @@ async function processOne(item) {
       outputPath = folder + "/" + outName;
     }
 
-    completedDownloads.push({  name: outputPath,  url: downloadUrl});
+    completedDownloads.push({ name: outputPath, url: downloadUrl });
+    setStatus(item, "done", `<a href="${downloadUrl}" target="_blank">Download</a>`);
 
-  processingLog.push({  
-    fileName: item.displayName,  
-    relativePath: item.relativePath,  
-    fileSizeKB: (item.file.size / 1024).toFixed(1),  
-    status: "SUCCESS",  
-    started: startTime.toISOString(),  
-    completed: new Date().toISOString(),  
-    durationSeconds:    Math.round((new Date() - startTime) / 1000),  
-    outputFile: outputPath,
-    downloadUrl: downloadUrl,
-    error: ""
-  });
-
-   setStatus(  
-    item,
-    "done",
-    '<a href="' + downloadUrl + '" target="_blank">📥 Download</a>'
-    
-  );
-
-} catch (err) {   
-	processingLog.push({    
-		fileName: item.displayName,
-    relativePath: item.relativePath,
-    fileSizeKB: (item.file.size / 1024).toFixed(1),
-    status: "FAILED",
-    started: startTime.toISOString(),
-    completed: new Date().toISOString(),
-    durationSeconds:Math.round((new Date() - startTime) / 1000),
-    outputFile: "",
-    downloadUrl: "",
-    error: err.message || "Unknown error"  
-  });
-  
-  console.error(item.displayName, err);
-  setStatus(    item,    "error",    err.message || "Error"  );
-}
-
+  } catch (err) {
+    console.error(item.displayName, err);
+    setStatus(item, "error", "Error");
+  }
 
   updateSummary();
 }
@@ -493,53 +442,17 @@ async function downloadAll() {
 
   try {
     const zip = new JSZip();
+
     for (const item of completedDownloads) {
       const resp = await fetch(item.url);
       const blob = await resp.blob();
 
+      // Folder structure preserved inside ZIP
       zip.file(item.name, blob);
     }
-    // =====================================================
-    // CSV LOG
-    // ===================================================== 
-    const csvRows = [  
-      [    
-        "FileName",
-        "RelativePath",
-        "FileSizeKB",
-        "Status",
-        "Started",
-        "Completed",
-        "DurationSeconds",
-        "OutputFile",
-        "Error"
-      ].join(",")
-    ];
 
-    for (const log of processingLog) {
-      csvRows.push([
-        `"${log.fileName || ""}"`,
-        `"${log.relativePath || ""}"`,
-        `"${log.fileSizeKB || ""}"`,
-        `"${log.status || ""}"`,
-        `"${log.started || ""}"`,
-        `"${log.completed || ""}"`,
-        `"${log.durationSeconds || ""}"`,
-        `"${log.outputFile || ""}"`,
-        `"${log.error || ""}"`
-      ].join(","));
-    }
-    zip.file(  "ocr_processing_log.csv",  csvRows.join("\n"));
-    // =====================================================
-    // JSON LOG
-    // ===================================================== 
-    zip.file(  
-      "ocr_processing_log.json",
-    JSON.stringify(processingLog, null, 2)
-  );
-
-  const content = await zip.generateAsync({ type: "blob" });
-  saveAs(content, "ocr_results.zip");
+    const content = await zip.generateAsync({ type: "blob" });
+    saveAs(content, "ocr_results.zip");
 
   } catch (err) {
     console.error("ZIP error:", err);

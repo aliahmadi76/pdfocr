@@ -1,3 +1,4 @@
+from fileinput import filename
 import os
 from datetime import datetime, timedelta
 
@@ -72,6 +73,7 @@ def get_ocr_pdf(req: func.HttpRequest) -> func.HttpResponse:
 
     op = req.params.get("op")
     filename_input = req.params.get("filename", "")
+    job_id = req.params.get("job_id", "")
 
     if not op:
         return func.HttpResponse("Missing op", status_code=400)
@@ -109,25 +111,32 @@ def get_ocr_pdf(req: func.HttpRequest) -> func.HttpResponse:
 
     container = "outputs"
 
-    if filename_input:
-        base = filename_input.rsplit(".", 1)[0]
-        filename = f"{base}_ocr.pdf"
-    else:
-        filename = f"{result_id}_ocr.pdf"
+     if filename_input:
+        filename = filename_input
+    else:    
+        filename = f"{result_id}.pdf" 
+    if job_id:    
+        blob_name = f"{job_id}/{filename}"
+    else:    
+	    blob_name = filename    
 
-    blob_client = blob_service.get_blob_client(container=container, blob=filename)
+    
+    
+    
+    
+    blob_client = blob_service.get_blob_client(container=container, blob=blob_name)
     blob_client.upload_blob(pdf_resp.content, overwrite=True)
 
     # ✅ SAS link
     sas = generate_blob_sas(
         account_name=os.environ["STORAGE_ACCOUNT_NAME"],
         container_name=container,
-        blob_name=filename,
+        blob_name=blob_name,
         account_key=os.environ["STORAGE_ACCOUNT_KEY"],
         permission=BlobSasPermissions(read=True),
         expiry=datetime.utcnow() + timedelta(hours=1)
     )
 
-    url = f"https://{os.environ['STORAGE_ACCOUNT_NAME']}.blob.core.windows.net/{container}/{filename}?{sas}"
+    url = f"https://{os.environ['STORAGE_ACCOUNT_NAME']}.blob.core.windows.net/{container}/{blob_name}?{sas}"
 
     return func.HttpResponse(url)
