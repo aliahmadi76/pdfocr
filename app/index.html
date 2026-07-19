@@ -204,6 +204,7 @@ const BASE = "https://fn-pdfocr-api.azurewebsites.net";
 // ============================================================
 let selectedFiles = [];        // { file, relativePath, displayName }
 let completedDownloads = [];   // { name, url }
+let processingLog = [];        // OCR processing log
 
 // ============================================================
 //  DROP ZONE (individual files)
@@ -335,10 +336,18 @@ function setStatus(item, phase, html) {
 
 function updateSummary() {
   const total = selectedFiles.length;
-  const done  = completedDownloads.length;
-  document.getElementById("summary").innerText = `${done} / ${total} completed`;
-  document.getElementById("btnDownloadAll").disabled = done === 0;
+  const successful = processingLog.filter(
+    x => x.status === "SUCCESS"
+  ).length;
+  const failed = processingLog.filter(
+    x => x.status === "FAILED"  
+  ).length;
+  document.getElementById("summary").innerText =    
+    `Successful: ${successful} | Failed: ${failed} | Total: ${total}`;
+  
+  document.getElementById("btnDownloadAll").disabled = completedDownloads.length === 0;
 }
+
 
 // ============================================================
 //  PROCESS ALL (concurrent, up to 3)
@@ -346,6 +355,7 @@ function updateSummary() {
 async function processAll() {
   document.getElementById("btnProcess").disabled = true;
   completedDownloads = [];
+  processingLog = [];
   updateSummary();
 
   const queue = [...selectedFiles];
@@ -369,6 +379,7 @@ async function runWorker(queue) {
 
 async function processOne(item) {
   const safe = safeName(item.displayName);
+  const startTime = new Date();
 
   try {
     // 1. Get SAS URL
@@ -420,13 +431,40 @@ async function processOne(item) {
       outputPath = folder + "/" + outName;
     }
 
-    completedDownloads.push({ name: outputPath, url: downloadUrl });
-    setStatus(item, "done", `<a href="${downloadUrl}" target="_blank">Download</a>`);
+    completedDownloads.push({  name: outputPath,  url: downloadUrl});
 
-  } catch (err) {
-    console.error(item.displayName, err);
-    setStatus(item, "error", "Error");
-  }
+  processingLog.push({  
+    fileName: item.displayName,  
+    relativePath: item.relativePath,  
+    fileSizeKB: (item.file.size / 1024).toFixed(1),  
+    status: "SUCCESS",  
+    started: startTime.toISOString(),  
+    completed: new Date().toISOString(),  
+    durationSeconds:    Math.round((new Date() - startTime) / 1000),  
+    outputFile: outputPath,
+    downloadUrl: downloadUrl,
+    error: ""
+  });
+setStatus(  item,  "done",  `${downloadUrl}Download</a>`);
+
+} catch (err) {   
+	processingLog.push({    
+		fileName: item.displayName,
+    relativePath: item.relativePath,
+    fileSizeKB: (item.file.size / 1024).toFixed(1),
+    status: "FAILED",
+    started: startTime.toISOString(),
+    completed: new Date().toISOString(),
+    durationSeconds:Math.round((new Date() - startTime) / 1000),
+    outputFile: "",
+    downloadUrl: "",
+    error: err.message || "Unknown error"  
+  });
+  
+  console.error(item.displayName, err);
+  setStatus(    item,    "error",    err.message || "Error"  );
+}
+
 
   updateSummary();
 }
@@ -442,17 +480,53 @@ async function downloadAll() {
 
   try {
     const zip = new JSZip();
-
     for (const item of completedDownloads) {
       const resp = await fetch(item.url);
       const blob = await resp.blob();
 
-      // Folder structure preserved inside ZIP
       zip.file(item.name, blob);
     }
+    // =====================================================
+    // CSV LOG
+    // ===================================================== 
+    const csvRows = [  
+      [    
+        "FileName",
+        "RelativePath",
+        "FileSizeKB",
+        "Status",
+        "Started",
+        "Completed",
+        "DurationSeconds",
+        "OutputFile",
+        "Error"
+      ].join(",")
+    ];
 
-    const content = await zip.generateAsync({ type: "blob" });
-    saveAs(content, "ocr_results.zip");
+    for (const log of processingLog) {
+      csvRows.push([
+        `"${log.fileName || ""}"`,
+        `"${log.relativePath || ""}"`,
+        `"${log.fileSizeKB || ""}"`,
+        `"${log.status || ""}"`,
+        `"${log.started || ""}"`,
+        `"${log.completed || ""}"`,
+        `"${log.durationSeconds || ""}"`,
+        `"${log.outputFile || ""}"`,
+        `"${log.error || ""}"`
+      ].join(","));
+    }
+    zip.file(  "ocr_processing_log.csv",  csvRows.join("\n"));
+    // =====================================================
+    // JSON LOG
+    // ===================================================== 
+    zip.file(  
+      "ocr_processing_log.json",
+    JSON.stringify(processingLog, null, 2)
+  );
+
+  const content = await zip.generateAsync({ type: "blob" });
+  saveAs(content, "ocr_results.zip");
 
   } catch (err) {
     console.error("ZIP error:", err);
