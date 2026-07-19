@@ -422,8 +422,9 @@ async function processOne(item) {
     }
 
     // 5. Done — preserve folder structure in output name
-    const outName = safe.replace(/\.pdf$/i, "") + "_ocr.pdf";
-
+    //Now Preserve the original filename
+    //const outName = safe.replace(/\.pdf$/i, "") + "_ocr.pdf";
+    const outName = item.displayName;
     // Build output path (preserving folder structure)
     let outputPath = outName;
     if (item.relativePath && item.relativePath.includes("/")) {
@@ -445,7 +446,8 @@ async function processOne(item) {
     downloadUrl: downloadUrl,
     error: ""
   });
-setStatus(  item,  "done",  `${downloadUrl}Download</a>`);
+
+  setStatus(  item,  "done    `${downloadUrl}📥 Download</a>`);
 
 } catch (err) {   
 	processingLog.push({    
