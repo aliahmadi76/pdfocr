@@ -450,7 +450,8 @@ async function processOne(item) {
    setStatus(  
     item,
     "done",
-    `${downloadUrl}📥 Download</a>`
+    '<a href="' + downloadUrl + '" target="_blank">📥 Download</a>'
+    
   );
 
 } catch (err) {   
