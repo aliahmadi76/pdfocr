@@ -328,7 +328,6 @@ Check:
 4. `function_app.py` compiles.
 5. Required Function App settings exist:
    - `STORAGE_ACCOUNT_NAME`
-   - `STORAGE_ACCOUNT_KEY`
    - `AzureWebJobsStorage`
    - `DOCINTEL_ENDPOINT`
    - `DOCINTEL_KEY`

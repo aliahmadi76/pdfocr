@@ -49,7 +49,7 @@ Access is controlled by assignment. Both apps have "Assignment required" turned 
 
 Function App `fn-pdfocr-api` → Configuration:
 
-- `STORAGE_ACCOUNT_NAME`, `STORAGE_ACCOUNT_KEY`: sign SAS URLs.
+- `STORAGE_ACCOUNT_NAME`: storage account name. Blob access and SAS signing use the Function App's managed identity, so no storage key is stored for the app.
 - `AzureWebJobsStorage`: storage connection string for the Functions host and output writes.
 - `DOCINTEL_ENDPOINT`, `DOCINTEL_KEY`: Document Intelligence.
 - `APPLICATIONINSIGHTS_CONNECTION_STRING`, `FUNCTIONS_WORKER_RUNTIME`, `FUNCTIONS_EXTENSION_VERSION`, `AzureWebJobsFeatureFlags`: runtime.
@@ -165,7 +165,7 @@ Front-end and back-end deployments are independent. When an API change affects `
 
 ### Remaining gaps, in priority order
 
-1. **Shared keys in app settings.** Move the Function App to a managed identity with the Storage Blob Data Contributor and Cognitive Services User roles, then turn off shared key access on the storage account. This also needs `api/function_app.py` changes to use `DefaultAzureCredential` and a user-delegation SAS. Plan and test before changing it.
+1. **Shared keys in app settings (partly done).** The Function App now uses its managed identity for blob access and user-delegation SAS links. `STORAGE_ACCOUNT_KEY` has been removed. Still open: the Consumption content share (`WEBSITE_CONTENTAZUREFILECONNECTIONSTRING`) and `AzureWebJobsStorage` still use account keys, so shared key access on the storage account cannot be turned off until the plan changes. Document Intelligence still uses `DOCINTEL_KEY`.
 2. **Network restriction.** The storage account and Document Intelligence still accept public traffic. Restrict to the Function App's outbound addresses or private endpoints where possible.
 3. **Key Vault.** Move `AZURE_CLIENT_SECRET`, `DOCINTEL_KEY` and the storage key into Key Vault references.
 4. **Input validation in `/api/upload`.** It signs an upload URL for any filename and does not limit size or type. Add an extension allow-list and a size limit.
@@ -178,8 +178,10 @@ Old backup folders with earlier secrets were deleted on 2026-11-20. Do not creat
 
 ### Rotate the storage account key
 
+The app itself no longer uses a storage key. The key is still needed for the Function App's `AzureWebJobsStorage` and content share, and the SWA's `AzureWebJobsStorage`.
+
 1. Regenerate **key2** (`az storage account keys renew -n pdfocrvzeotjuko574ust -g rg-pdf-ocr --key secondary`).
-2. Set the new key2 in the Function App (`STORAGE_ACCOUNT_KEY`, `AzureWebJobsStorage`) and on the SWA default environment (`AzureWebJobsStorage`).
+2. Set the new key2 in the Function App (`AzureWebJobsStorage`) and on the SWA default environment (`AzureWebJobsStorage`).
 3. Test `/api/upload` and a small conversion.
 4. Regenerate **key1** and leave it unused until the next rotation.
 
@@ -256,7 +258,7 @@ To reduce costs: shorten the retention window (with user agreement), delete unus
 ## 13. Known issues and open questions
 
 - The SWA is in East Asia, while the other resources are in Australia East. Check whether the split is intended; it may add latency.
-- Whether a real sign-in and upload works after the 2026-11-20 changes (key rotation, assignment, CORS) has not been confirmed by a user test.
+- Sign-in, upload, conversion and download were confirmed working by the owner on 2026-11-21, after the managed identity change.
 - The reason the earlier popup sign-in hung was not confirmed.
 - `api/function_app.py` is committed with the indentation fix. Its earlier uncommitted edits are no longer open.
 - Remote branches `secure-auth`, `fix-popup-sign-in` and `pre-auth-backup` still exist. Delete them only after the owner agrees.

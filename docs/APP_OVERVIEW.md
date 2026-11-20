@@ -56,7 +56,7 @@ For each selected PDF, the browser runs these steps (three files at a time):
 
 These must exist in `fn-pdfocr-api` → Configuration:
 
-- `STORAGE_ACCOUNT_NAME`, `STORAGE_ACCOUNT_KEY`: used to sign SAS URLs.
+- `STORAGE_ACCOUNT_NAME`: used with the Function App's managed identity to write blobs and sign user-delegation SAS URLs. Requires the Storage Blob Data Contributor and Storage Blob Delegator roles on the storage account.
 - `AzureWebJobsStorage`: connection string, used to write outputs.
 - `DOCINTEL_ENDPOINT`, `DOCINTEL_KEY`: Document Intelligence.
 
@@ -78,7 +78,7 @@ Do not put these values in git. Export them to a private file if you need a back
 - **B. Enforce Function App sign-in.** Done 2026-11-20: unauthenticated requests return 401. A signed-in user test is still needed.
 - **C. Access scope.** Done 2026-11-20: "Assignment required" is on `pdfocr-api` and `FMA PDF OCR Tool`. Assigned to `App_PdfOCR_Users` and Data and Evidence Team.
 - **D. Power Apps.** Done 2026-11-21: the Power Apps origin was removed from the storage CORS rules. The API's Function App CORS list no longer includes it either.
-- **E. Known weaknesses.** `/api/upload` will sign an upload URL for any filename. The functions use the storage account key rather than managed identity. Document Intelligence and storage keys are plain app settings. Address these in a later change.
+- **E. Known weaknesses.** `/api/upload` will sign an upload URL for any filename. Storage access uses managed identity, but the Consumption content share and `AzureWebJobsStorage` still use account keys. Document Intelligence and storage keys are plain app settings. Address these in a later change.
 
 ## 5. Repository contents to clean up
 
