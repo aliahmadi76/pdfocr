@@ -5,9 +5,30 @@ from datetime import datetime, timedelta
 import azure.functions as func
 import requests   # ✅ add only now
 import json
-from azure.storage.blob import generate_blob_sas, BlobSasPermissions
+from azure.identity import DefaultAzureCredential
+from azure.storage.blob import BlobServiceClient, generate_blob_sas, BlobSasPermissions
 
 app = func.FunctionApp()
+
+
+def _blob_service() -> BlobServiceClient:
+    account_url = f"https://{os.environ['STORAGE_ACCOUNT_NAME']}.blob.core.windows.net"
+    return BlobServiceClient(account_url, credential=DefaultAzureCredential())
+
+
+def _user_delegation_sas(service: BlobServiceClient, container: str, blob_name: str, permission: BlobSasPermissions) -> str:
+    start = datetime.utcnow() - timedelta(minutes=5)
+    expiry = datetime.utcnow() + timedelta(hours=1)
+    delegation_key = service.get_user_delegation_key(start, expiry)
+    return generate_blob_sas(
+        account_name=os.environ["STORAGE_ACCOUNT_NAME"],
+        container_name=container,
+        blob_name=blob_name,
+        user_delegation_key=delegation_key,
+        permission=permission,
+        start=start,
+        expiry=expiry
+    )
 
 @app.function_name(name="hello")
 @app.route(route="hello", auth_level=func.AuthLevel.ANONYMOUS)
@@ -23,15 +44,12 @@ def upload(req: func.HttpRequest) -> func.HttpResponse:
         return func.HttpResponse("Missing filename", status_code=400)
 
     account_name = os.environ.get("STORAGE_ACCOUNT_NAME")
-    account_key = os.environ.get("STORAGE_ACCOUNT_KEY")
 
-    sas = generate_blob_sas(
-        account_name=account_name,
-        container_name="uploads",
+    sas = _user_delegation_sas(
+        _blob_service(),
+        container="uploads",
         blob_name=filename,
-        account_key=account_key,
-        permission=BlobSasPermissions(read=True, write=True),
-        expiry=datetime.utcnow() + timedelta(hours=1)
+        permission=BlobSasPermissions(read=True, write=True)
     )
 
     url = (
@@ -73,7 +91,6 @@ def start_ocr(req: func.HttpRequest) -> func.HttpResponse:
 def get_ocr_pdf(req: func.HttpRequest) -> func.HttpResponse:
 
     import re
-    from azure.storage.blob import BlobServiceClient
 
     op = req.params.get("op")
     filename_input = req.params.get("filename", "")
@@ -111,7 +128,7 @@ def get_ocr_pdf(req: func.HttpRequest) -> func.HttpResponse:
         return func.HttpResponse("Failed to fetch PDF", status_code=500)
 
     # ✅ save to blob
-    blob_service = BlobServiceClient.from_connection_string(os.environ["AzureWebJobsStorage"])
+    blob_service = _blob_service()
 
     container = "outputs"
     if filename_input:
@@ -127,13 +144,11 @@ def get_ocr_pdf(req: func.HttpRequest) -> func.HttpResponse:
     blob_client.upload_blob(pdf_resp.content, overwrite=True)
 
     # ✅ SAS link
-    sas = generate_blob_sas(
-        account_name=os.environ["STORAGE_ACCOUNT_NAME"],
-        container_name=container,
+    sas = _user_delegation_sas(
+        blob_service,
+        container=container,
         blob_name=blob_name,
-        account_key=os.environ["STORAGE_ACCOUNT_KEY"],
-        permission=BlobSasPermissions(read=True),
-        expiry=datetime.utcnow() + timedelta(hours=1)
+        permission=BlobSasPermissions(read=True)
     )
 
     url = f"https://{os.environ['STORAGE_ACCOUNT_NAME']}.blob.core.windows.net/{container}/{blob_name}?{sas}"
