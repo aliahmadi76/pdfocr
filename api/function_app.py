@@ -34,7 +34,11 @@ def upload(req: func.HttpRequest) -> func.HttpResponse:
         expiry=datetime.utcnow() + timedelta(hours=1)
     )
 
-    url = f"https://{account_name}.blob.core.windows.net/uploads/{filename}?{sas}"
+    url = (
+        f"https://{account_name}"
+        f".blob.core.windows.net/uploads/"
+        f"{filename}?{sas}"
+    )
     return func.HttpResponse(url)
 
 @app.function_name(name="start_ocr")
@@ -110,20 +114,15 @@ def get_ocr_pdf(req: func.HttpRequest) -> func.HttpResponse:
     blob_service = BlobServiceClient.from_connection_string(os.environ["AzureWebJobsStorage"])
 
     container = "outputs"
-
-     if filename_input:
+    if filename_input:
         filename = filename_input
-    else:    
-        filename = f"{result_id}.pdf" 
-    if job_id:    
+    else:
+        filename = f"{result_id}.pdf"
+    if job_id:
         blob_name = f"{job_id}/{filename}"
-    else:    
-	    blob_name = filename    
+    else:
+        blob_name = filename
 
-    
-    
-    
-    
     blob_client = blob_service.get_blob_client(container=container, blob=blob_name)
     blob_client.upload_blob(pdf_resp.content, overwrite=True)
 

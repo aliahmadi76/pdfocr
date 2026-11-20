@@ -87,7 +87,7 @@ Before the next push to `main` (which deploys all of `app/`):
 - `app/index copy*.html` and `app/index copy before changes.html`: old versions that call the API without a token. They are published with the site, so move them out of the repo.
 - `app/staticwebapp.config copy.json` and `api/function_app copy.py`: old copies. Remove.
 - `docs/old func.bak`, `api/__pycache__/`: remove, or add to `.gitignore`.
-- `api/function_app.py`: has uncommitted changes that were not made by the auth work. Review them before publishing.
+- `api/function_app.py`: fixed an indentation error that stopped the committed file from compiling, and wrapped one long URL line. Reviewed and committed.
 
 ## 6. Deploying
 

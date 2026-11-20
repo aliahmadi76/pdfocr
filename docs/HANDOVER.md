@@ -87,7 +87,7 @@ Endpoints: `/api/hello` (health, returns `Hello works`), `/api/upload`, `/api/st
 | `.github/workflows/swa.yml` | Deploys `app/` to the Static Web App on every push to `main`. |
 | `docs/` | Documentation. |
 
-Clean-up still pending before the next push to `main` (the workflow publishes all of `app/`): old copies such as `app/index copy*.html`, `app/staticwebapp.config copy.json`, `api/function_app copy.py`, `docs/old func.bak`, and `api/__pycache__/`. Remove them, or add them to `.gitignore`. `api/function_app.py` also has uncommitted changes that need review before publishing.
+Clean-up status: the old copies have been removed from the working tree and git (`api/function_app copy.py`, `docs/old func.bak`). `api/__pycache__/` is a local build folder and should be added to `.gitignore`.
 
 ## 6. Deploying the Static Web App (front end)
 
@@ -258,7 +258,7 @@ To reduce costs: shorten the retention window (with user agreement), delete unus
 - The SWA is in East Asia, while the other resources are in Australia East. Check whether the split is intended; it may add latency.
 - Whether a real sign-in and upload works after the 2026-11-20 changes (key rotation, assignment, CORS) has not been confirmed by a user test.
 - The reason the earlier popup sign-in hung was not confirmed.
-- `api/function_app.py` has uncommitted changes that need review.
+- `api/function_app.py` is committed with the indentation fix. Its earlier uncommitted edits are no longer open.
 - Remote branches `secure-auth`, `fix-popup-sign-in` and `pre-auth-backup` still exist. Delete them only after the owner agrees.
 
 ## 14. Further reading
