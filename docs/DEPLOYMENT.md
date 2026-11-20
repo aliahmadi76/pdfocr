@@ -195,7 +195,7 @@ func azure functionapp publish <FUNCTION_APP_NAME> --python --build remote
 Example:
 
 ```powershell
-func azure functionapp publish pdfocr-api-prod --python --build remote
+func azure functionapp publish fn-pdfocr-api --python --build remote
 ```
 
 Do not assume the Function App name is the same as the URL or previous examples. Confirm it with Azure if unsure.

@@ -69,15 +69,15 @@ Do not put these values in git. Export them to a private file if you need a back
 | Storage | Anonymous blob access disabled on the account (`allowBlobPublicAccess = false`). Containers are private. | Done |
 | Storage | Browser and function use time-limited SAS URLs only. | Done |
 | Frontend (Static Web App) | Built-in Entra login through the "FMA PDF OCR Tool" app registration. `staticwebapp.config.json` requires the `authenticated` role on all routes. | In place (see open item A) |
-| Function App | Easy Auth with Entra ID, issuer `bd831b0c-3781-40ec-801e-5dfba266decf`, audience `api://8c9e2fe0-…`. Browser sends a bearer token from MSAL. | Configured, **still AllowAnonymous** (see open item B) |
-| Function App | Any member of the FMA tenant can get a token (assignment not required). | By design, see open item C |
+| Function App | Easy Auth with Entra ID, audience `api://8c9e2fe0-…`. Unauthenticated requests return 401. | Done (open item B) |
+| Function App | Only assigned users can get a token ("Assignment required" on `pdfocr-api`, with `App_PdfOCR_Users` assigned). | Done (open item C) |
 
 ### Open items
 
 - **A. Two sign-in layers.** The Static Web App login and the MSAL popup both ask the user to sign in. Confirm whether the SWA login is wanted. If yes, the user signs in twice; if not, remove the SWA login rules.
-- **B. Enforce Function App sign-in.** In the portal, open `fn-pdfocr-api` → Authentication → Edit → set Unauthenticated requests to **HTTP 401 Unauthorized**. Do this only after the Power Apps check below. Then test: a call without a token returns 401, and a signed-in conversion succeeds.
-- **C. Access scope.** To limit access to a group, set "Assignment required" on the `pdfocr-api` enterprise app and assign the group.
-- **D. Power Apps.** The CORS list includes `orchard-harvest.wus-il301.gateway.prod.island.powerapps.com`. Confirm whether anything calls this API from Power Apps. If it does, it needs its own route or token once B is enforced.
+- **B. Enforce Function App sign-in.** Done 2026-11-20: unauthenticated requests return 401. A signed-in user test is still needed.
+- **C. Access scope.** Done 2026-11-20: "Assignment required" is on `pdfocr-api` and `FMA PDF OCR Tool`. Assigned to `App_PdfOCR_Users` and Data and Evidence Team.
+- **D. Power Apps.** Done 2026-11-21: the Power Apps origin was removed from the storage CORS rules. The API's Function App CORS list no longer includes it either.
 - **E. Known weaknesses.** `/api/upload` will sign an upload URL for any filename. The functions use the storage account key rather than managed identity. Document Intelligence and storage keys are plain app settings. Address these in a later change.
 
 ## 5. Repository contents to clean up

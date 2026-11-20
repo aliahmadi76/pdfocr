@@ -4,6 +4,7 @@ This repository contains the FMA PDF OCR Tool front-end and Azure Function API s
 
 ## Key documents
 
+- [Handover and project guide](docs/HANDOVER.md) (start here)
 - [Deployment guide](docs/DEPLOYMENT.md)
 - [Function App deployment guide](docs/FUNCTION_APP_DEPLOYMENT.md)
 - [Troubleshooting guide](docs/TROUBLESHOOTING.md)
