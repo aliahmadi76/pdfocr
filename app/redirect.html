@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Signing in...</title>
+  <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+</head>
+<body>
+<p>Completing sign-in. You can close this window if it does not close automatically.</p>
+<script>
+  // Sign-in popup return page. It only completes the sign-in and lets MSAL hand the result back to the main window.
+  const msalApp = new msal.PublicClientApplication({
+    auth: {
+      clientId: "8c9e2fe0-3dca-4425-b58d-a97e76dbb36e",
+      authority: "https://login.microsoftonline.com/bd831b0c-3781-40ec-801e-5dfba266decf",
+      redirectUri: window.location.origin + "/redirect.html"
+    },
+    cache: { cacheLocation: "sessionStorage" }
+  });
+  msalApp.initialize().then(() => msalApp.handleRedirectPromise()).catch((err) => {
+    document.body.textContent = "Sign-in failed: " + (err && err.errorMessage ? err.errorMessage : err);
+  });
+</script>
+</body>
+</html>

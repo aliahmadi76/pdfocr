@@ -207,7 +207,7 @@ const AUTH = {
 };
 
 const msalApp = new msal.PublicClientApplication({
-  auth: { clientId: AUTH.clientId, authority: AUTH.authority, redirectUri: window.location.origin + "/" },
+  auth: { clientId: AUTH.clientId, authority: AUTH.authority, redirectUri: window.location.origin + "/redirect.html" },
   cache: { cacheLocation: "sessionStorage" }
 });
 const msalReady = msalApp.initialize().then(() => msalApp.handleRedirectPromise());
