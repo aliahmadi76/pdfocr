@@ -206,18 +206,26 @@ const AUTH = {
   scopes: ["api://8c9e2fe0-3dca-4425-b58d-a97e76dbb36e/user_impersonation"]
 };
 
+const POPUP_REDIRECT = window.location.origin + "/redirect.html";
 const msalApp = new msal.PublicClientApplication({
   auth: { clientId: AUTH.clientId, authority: AUTH.authority, redirectUri: window.location.origin + "/" },
-  cache: { cacheLocation: "sessionStorage" }
+  cache: { cacheLocation: "localStorage" }
 });
-const msalReady = msalApp.initialize().then(() => msalApp.handleRedirectPromise());
+// Signs in as soon as the page loads (before any files are chosen), so a full-page redirect loses nothing.
+const msalReady = msalApp.initialize()
+  .then(() => msalApp.handleRedirectPromise())
+  .then((response) => {
+    if (!response && msalApp.getAllAccounts().length === 0) {
+      return msalApp.loginRedirect({ scopes: AUTH.scopes });
+    }
+  });
 
-// Uses a popup so the page keeps the selected files while signing in.
+// Silent token first; popup only as a fallback.
 async function getAccessToken() {
   await msalReady;
   const account = msalApp.getActiveAccount() || msalApp.getAllAccounts()[0];
   if (!account) {
-    const login = await msalApp.loginPopup({ scopes: AUTH.scopes });
+    const login = await msalApp.loginPopup({ scopes: AUTH.scopes, redirectUri: POPUP_REDIRECT });
     msalApp.setActiveAccount(login.account);
     return login.accessToken;
   }
@@ -226,7 +234,7 @@ async function getAccessToken() {
     const result = await msalApp.acquireTokenSilent({ scopes: AUTH.scopes, account });
     return result.accessToken;
   } catch (err) {
-    const result = await msalApp.acquireTokenPopup({ scopes: AUTH.scopes, account });
+    const result = await msalApp.acquireTokenPopup({ scopes: AUTH.scopes, account, redirectUri: POPUP_REDIRECT });
     return result.accessToken;
   }
 }
