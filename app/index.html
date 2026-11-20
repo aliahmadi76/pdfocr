@@ -6,6 +6,7 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
   <style>
 
   
@@ -199,6 +200,46 @@
 // ============================================================
 const BASE = "https://fn-pdfocr-api.azurewebsites.net";
 
+const AUTH = {
+  clientId: "8c9e2fe0-3dca-4425-b58d-a97e76dbb36e",
+  authority: "https://login.microsoftonline.com/bd831b0c-3781-40ec-801e-5dfba266decf",
+  scopes: ["api://8c9e2fe0-3dca-4425-b58d-a97e76dbb36e/user_impersonation"]
+};
+
+const msalApp = new msal.PublicClientApplication({
+  auth: { clientId: AUTH.clientId, authority: AUTH.authority, redirectUri: window.location.origin + "/" },
+  cache: { cacheLocation: "sessionStorage" }
+});
+const msalReady = msalApp.initialize().then(() => msalApp.handleRedirectPromise());
+
+// Uses a popup so the page keeps the selected files while signing in.
+async function getAccessToken() {
+  await msalReady;
+  const account = msalApp.getActiveAccount() || msalApp.getAllAccounts()[0];
+  if (!account) {
+    const login = await msalApp.loginPopup({ scopes: AUTH.scopes });
+    msalApp.setActiveAccount(login.account);
+    return login.accessToken;
+  }
+  msalApp.setActiveAccount(account);
+  try {
+    const result = await msalApp.acquireTokenSilent({ scopes: AUTH.scopes, account });
+    return result.accessToken;
+  } catch (err) {
+    const result = await msalApp.acquireTokenPopup({ scopes: AUTH.scopes, account });
+    return result.accessToken;
+  }
+}
+
+// Calls the Function API with the signed-in user's bearer token.
+async function apiFetch(url, options = {}) {
+  const token = await getAccessToken();
+  return fetch(url, {
+    ...options,
+    headers: { ...(options.headers || {}), Authorization: "Bearer " + token }
+  });
+}
+
 // ============================================================
 //  STATE
 // ============================================================
@@ -354,6 +395,12 @@ function updateSummary() {
 //  PROCESS ALL (concurrent, up to 3)
 // ============================================================
 async function processAll() {
+  try {
+    await getAccessToken();
+  } catch (err) {
+    alert("Sign-in failed or was cancelled: " + (err.errorMessage || err.message));
+    return;
+  }
   document.getElementById("btnProcess").disabled = true;
   completedDownloads = [];
   processingLog = [];
@@ -390,7 +437,7 @@ async function processOne(item) {
   try {
     // 1. Get SAS URL
     setStatus(item, "uploading", "Uploading...");
-    const sasResp = await fetch(`${BASE}/api/upload?filename=${encodeURIComponent(safe)}`);
+    const sasResp = await apiFetch(`${BASE}/api/upload?filename=${encodeURIComponent(safe)}`);
     if (!sasResp.ok) throw new Error("SAS failed");
     const sas = await sasResp.text();
 
@@ -404,7 +451,7 @@ async function processOne(item) {
 
     // 3. Start OCR
     setStatus(item, "starting", "Starting OCR...");
-    const ocrResp = await fetch(`${BASE}/api/start-ocr`, {
+    const ocrResp = await apiFetch(`${BASE}/api/start-ocr`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ blob_url: sas, filename: safe, job_id: currentJobId })
@@ -418,7 +465,7 @@ async function processOne(item) {
 
     while (!downloadUrl) {
       await new Promise(r => setTimeout(r, 2500));
-      const pollResp = await fetch(
+      const pollResp = await apiFetch(
         `${BASE}/api/get-ocr-pdf?op=${encodeURIComponent(op)}&filename=${encodeURIComponent(safe)}&job_id=${encodeURIComponent(currentJobId)}`
       );
       const text = await pollResp.text();
