@@ -15,7 +15,7 @@
       authority: "https://login.microsoftonline.com/bd831b0c-3781-40ec-801e-5dfba266decf",
       redirectUri: window.location.origin + "/redirect.html"
     },
-    cache: { cacheLocation: "sessionStorage" }
+    cache: { cacheLocation: "localStorage" }
   });
   msalApp.initialize().then(() => msalApp.handleRedirectPromise()).catch((err) => {
     document.body.textContent = "Sign-in failed: " + (err && err.errorMessage ? err.errorMessage : err);

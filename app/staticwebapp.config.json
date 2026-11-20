@@ -12,6 +12,10 @@
   },
   "routes": [
     {
+      "route": "/redirect.html",
+      "allowedRoles": ["anonymous"]
+    },
+    {
       "route": "/*",
       "allowedRoles": ["authenticated"]
     }
