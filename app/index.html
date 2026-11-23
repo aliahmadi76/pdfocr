@@ -221,22 +221,37 @@ const msalReady = msalApp.initialize()
   });
 
 // Silent token first; popup only as a fallback.
-async function getAccessToken() {
-  await msalReady;
+// Keeps one token in memory and shares a single in-flight request, so parallel uploads and polls
+// don't each fall back to a popup when silent renewal is blocked by the browser.
+let cachedToken = null;
+let tokenRequest = null;
+
+function acquireToken() {
   const account = msalApp.getActiveAccount() || msalApp.getAllAccounts()[0];
   if (!account) {
-    const login = await msalApp.loginPopup({ scopes: AUTH.scopes, redirectUri: POPUP_REDIRECT });
-    msalApp.setActiveAccount(login.account);
-    return login.accessToken;
+    return msalApp.loginPopup({ scopes: AUTH.scopes, redirectUri: POPUP_REDIRECT }).then((login) => {
+      msalApp.setActiveAccount(login.account);
+      return login;
+    });
   }
   msalApp.setActiveAccount(account);
-  try {
-    const result = await msalApp.acquireTokenSilent({ scopes: AUTH.scopes, account });
-    return result.accessToken;
-  } catch (err) {
-    const result = await msalApp.acquireTokenPopup({ scopes: AUTH.scopes, account, redirectUri: POPUP_REDIRECT });
-    return result.accessToken;
+  return msalApp.acquireTokenSilent({ scopes: AUTH.scopes, account }).catch(() =>
+    msalApp.acquireTokenPopup({ scopes: AUTH.scopes, account, redirectUri: POPUP_REDIRECT })
+  );
+}
+
+async function getAccessToken() {
+  await msalReady;
+  const fiveMinutes = 5 * 60 * 1000;
+  if (cachedToken && cachedToken.expiresOn.getTime() - Date.now() > fiveMinutes) {
+    return cachedToken.accessToken;
   }
+  if (!tokenRequest) {
+    tokenRequest = acquireToken()
+      .then((result) => { cachedToken = result; return result.accessToken; })
+      .finally(() => { tokenRequest = null; });
+  }
+  return tokenRequest;
 }
 
 // Calls the Function API with the signed-in user's bearer token.
