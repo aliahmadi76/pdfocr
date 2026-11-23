@@ -208,7 +208,8 @@ const AUTH = {
 
 const msalApp = new msal.PublicClientApplication({
   auth: { clientId: AUTH.clientId, authority: AUTH.authority, redirectUri: window.location.origin + "/" },
-  cache: { cacheLocation: "localStorage" }
+  // Also keep sign-in state in a cookie, so the return from Microsoft still works when Edge limits storage.
+  cache: { cacheLocation: "localStorage", storeAuthStateInCookie: true }
 });
 // Gets the API token as soon as the page loads (before any files are chosen), so a full-page redirect loses nothing.
 let cachedToken = null;
