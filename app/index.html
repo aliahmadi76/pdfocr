@@ -213,19 +213,48 @@ const msalApp = new msal.PublicClientApplication({
 });
 // Gets the API token as soon as the page loads (before any files are chosen), so a full-page redirect loses nothing.
 let cachedToken = null;
+// Stops automatic sign-in redirects after 3 within a minute, so a failing sign-in shows an error instead of looping.
+function guardRedirect() {
+  const now = Date.now();
+  const recent = JSON.parse(sessionStorage.getItem("authRedirects") || "[]").filter((t) => now - t < 60000);
+  if (recent.length >= 3) {
+    throw new Error("Sign-in keeps returning without a token. Stopped to break the loop.");
+  }
+  recent.push(now);
+  sessionStorage.setItem("authRedirects", JSON.stringify(recent));
+}
+
+function clearRedirectGuard() {
+  sessionStorage.removeItem("authRedirects");
+}
+
+function showAuthError(err) {
+  const box = document.createElement("div");
+  box.style.cssText = "background:#fde8e8;color:#8a1c1c;padding:12px;margin:12px;border-radius:6px;font-family:sans-serif";
+  box.textContent = "Sign-in error: " + (err.errorCode || err.message || err);
+  document.body.prepend(box);
+}
+
 const msalReady = msalApp.initialize()
   .then(() => msalApp.handleRedirectPromise())
   .then(async (response) => {
     if (response) {
       msalApp.setActiveAccount(response.account);
       cachedToken = response;
+      clearRedirectGuard();
       return;
     }
     if (msalApp.getAllAccounts().length === 0) {
+      guardRedirect();
       await msalApp.loginRedirect({ scopes: AUTH.scopes });
       return;
     }
     cachedToken = await acquireToken();
+  })
+  .catch((err) => {
+    console.error("Sign-in failed:", err);
+    showAuthError(err);
+    throw err;
   });
 
 // Silent renewal first. If the browser blocks it, redirect the whole page instead of using a popup.
@@ -233,6 +262,7 @@ const msalReady = msalApp.initialize()
 async function acquireToken() {
   const account = msalApp.getActiveAccount() || msalApp.getAllAccounts()[0];
   if (!account) {
+    guardRedirect();
     await msalApp.loginRedirect({ scopes: AUTH.scopes });
     return new Promise(() => {});
   }
@@ -240,6 +270,7 @@ async function acquireToken() {
   try {
     return await msalApp.acquireTokenSilent({ scopes: AUTH.scopes, account });
   } catch (err) {
+    guardRedirect();
     await msalApp.acquireTokenRedirect({ scopes: AUTH.scopes, account });
     return new Promise(() => {});
   }
@@ -257,7 +288,7 @@ async function getAccessToken() {
   }
   if (!tokenRequest) {
     tokenRequest = acquireToken()
-      .then((result) => { cachedToken = result; return result.accessToken; })
+      .then((result) => { cachedToken = result; clearRedirectGuard(); return result.accessToken; })
       .finally(() => { tokenRequest = null; });
   }
   return tokenRequest;
