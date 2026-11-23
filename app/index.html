@@ -207,7 +207,8 @@ const AUTH = {
 };
 
 const msalApp = new msal.PublicClientApplication({
-  auth: { clientId: AUTH.clientId, authority: AUTH.authority, redirectUri: window.location.origin + "/" },
+  // Returns go to the public redirect.html page, so the sign-in code is not lost to SWA's login check on "/".
+  auth: { clientId: AUTH.clientId, authority: AUTH.authority, redirectUri: window.location.origin + "/redirect.html" },
   // Also keep sign-in state in a cookie, so the return from Microsoft still works when Edge limits storage.
   cache: { cacheLocation: "localStorage", storeAuthStateInCookie: true }
 });
