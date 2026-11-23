@@ -206,39 +206,47 @@ const AUTH = {
   scopes: ["api://8c9e2fe0-3dca-4425-b58d-a97e76dbb36e/user_impersonation"]
 };
 
-const POPUP_REDIRECT = window.location.origin + "/redirect.html";
 const msalApp = new msal.PublicClientApplication({
   auth: { clientId: AUTH.clientId, authority: AUTH.authority, redirectUri: window.location.origin + "/" },
   cache: { cacheLocation: "localStorage" }
 });
-// Signs in as soon as the page loads (before any files are chosen), so a full-page redirect loses nothing.
+// Gets the API token as soon as the page loads (before any files are chosen), so a full-page redirect loses nothing.
+let cachedToken = null;
 const msalReady = msalApp.initialize()
   .then(() => msalApp.handleRedirectPromise())
-  .then((response) => {
-    if (!response && msalApp.getAllAccounts().length === 0) {
-      return msalApp.loginRedirect({ scopes: AUTH.scopes });
+  .then(async (response) => {
+    if (response) {
+      msalApp.setActiveAccount(response.account);
+      cachedToken = response;
+      return;
     }
+    if (msalApp.getAllAccounts().length === 0) {
+      await msalApp.loginRedirect({ scopes: AUTH.scopes });
+      return;
+    }
+    cachedToken = await acquireToken();
   });
 
-// Silent token first; popup only as a fallback.
-// Keeps one token in memory and shares a single in-flight request, so parallel uploads and polls
-// don't each fall back to a popup when silent renewal is blocked by the browser.
-let cachedToken = null;
-let tokenRequest = null;
-
-function acquireToken() {
+// Silent renewal first. If the browser blocks it, redirect the whole page instead of using a popup.
+// The page navigates away in that case, so the never-resolving promise is intentional.
+async function acquireToken() {
   const account = msalApp.getActiveAccount() || msalApp.getAllAccounts()[0];
   if (!account) {
-    return msalApp.loginPopup({ scopes: AUTH.scopes, redirectUri: POPUP_REDIRECT }).then((login) => {
-      msalApp.setActiveAccount(login.account);
-      return login;
-    });
+    await msalApp.loginRedirect({ scopes: AUTH.scopes });
+    return new Promise(() => {});
   }
   msalApp.setActiveAccount(account);
-  return msalApp.acquireTokenSilent({ scopes: AUTH.scopes, account }).catch(() =>
-    msalApp.acquireTokenPopup({ scopes: AUTH.scopes, account, redirectUri: POPUP_REDIRECT })
-  );
+  try {
+    return await msalApp.acquireTokenSilent({ scopes: AUTH.scopes, account });
+  } catch (err) {
+    await msalApp.acquireTokenRedirect({ scopes: AUTH.scopes, account });
+    return new Promise(() => {});
+  }
 }
+
+// Keeps one token in memory and shares a single in-flight request, so parallel uploads and polls
+// don't each trigger their own token request.
+let tokenRequest = null;
 
 async function getAccessToken() {
   await msalReady;
