@@ -271,9 +271,10 @@ async function acquireToken() {
     return await msalApp.acquireTokenSilent({ scopes: AUTH.scopes, account });
   } catch (err) {
     // The saved SPA refresh token has expired (Microsoft limits these to a fixed lifetime), so clear it and sign in again.
+    // Naming the account and forcing a login avoids reusing the Windows-connected session that fails in this profile.
     msalApp.clearCache();
     guardRedirect();
-    await msalApp.loginRedirect({ scopes: AUTH.scopes });
+    await msalApp.loginRedirect({ scopes: AUTH.scopes, loginHint: account.username, prompt: "login" });
     return new Promise(() => {});
   }
 }
